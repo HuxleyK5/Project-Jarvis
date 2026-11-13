@@ -1,0 +1,3 @@
+# Python 3.12 runtime dependencies; no GPU/model packages.
+fastapi==0.162.7
+uvicorn==0.54.0
