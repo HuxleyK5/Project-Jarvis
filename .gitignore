@@ -13,6 +13,8 @@ htmlcov/
 node_modules/
 dist/
 *.tsbuildinfo
+test-results/
+playwright-report/
 
 # Local configuration and credentials
 .env

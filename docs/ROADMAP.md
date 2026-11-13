@@ -5,8 +5,9 @@ Only individual user prompts authorize implementation. This roadmap does not aut
 | Milestone | Scope | Status |
 | --- | --- | --- |
 | Phase 0: inspection | Read-only hardware/tool inventory and hardware report | Complete; actual audio and inference performance untested |
-| Initial structure | Independent Python backend, React/TypeScript/Vite scaffold, documentation and configuration examples | Created; frontend build awaits approved dependency installation |
+| Initial structure | Independent Python backend, React/TypeScript/Vite scaffold, documentation and configuration examples | Complete; frontend dependencies installed with approval |
 | Phase 1: backend foundation | Local FastAPI, health, configuration, errors, documentation, and tests | Complete; automated tests and live loopback startup verified |
+| Desktop dashboard | Responsive HUD, live backend connection, session conversation, activity, and browser tests | Complete; production build, 6 browser tests, real API connection, and local production preview verified |
 | Future phases | Scope to be provided by the user | Not specified or implemented |
 
 For each increment: inspect the existing project, preserve working behavior, implement only the requested scope, test important behavior, explain affected files and run/test steps, then stop.

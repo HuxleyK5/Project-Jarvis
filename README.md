@@ -1,6 +1,6 @@
 # JARVIS
 
-Personal AI assistant project built incrementally. Current scope: Phase 1 local FastAPI backend and independent frontend scaffold. AI, speech, automation, persistence, and integrations are not implemented.
+Personal AI assistant project built incrementally. Current scope: local FastAPI backend and responsive React desktop dashboard. AI, speech, automation, persistent memory, and external integrations are not implemented.
 
 This repository is the JARVIS root; no nested JARVIS directory is needed.
 
@@ -16,10 +16,10 @@ This repository is the JARVIS root; no nested JARVIS directory is needed.
 | backend/tools/ | Future narrowly scoped assistant capabilities |
 | backend/integrations/ | Future model runtime and external service adapters |
 | backend/tests/ | Backend tests |
-| frontend/ | Independent React, TypeScript, and Vite project |
+| frontend/ | Independent React, TypeScript, and Vite dashboard |
 | frontend/src/components/ | Reusable UI elements |
 | frontend/src/pages/ | Page-level views |
-| frontend/src/services/ | Future backend communication adapters |
+| frontend/src/services/ | Typed backend health client |
 | frontend/src/hooks/ | Reusable React hooks |
 | frontend/src/styles/ | Shared CSS |
 | data/ | Local runtime data, ignored by Git except its placeholder |
@@ -71,16 +71,19 @@ Run backend automated tests without starting a separate server:
 
 Phase 1 verification passed: automated API/configuration tests, dependency consistency, live startup, all three documented URLs, and loopback listener inspection. The current Starlette TestClient emits a non-failing deprecation warning about its HTTPX adapter; all tests pass. Direct dependency versions are pinned to the locally verified versions.
 
-## Frontend scaffold
+## Desktop dashboard
 
-After explicit approval to install frontend dependencies, run from `frontend/`:
+Frontend dependencies and Playwright were installed with approval. Start the backend in one terminal using the instructions above. In another terminal, from `frontend/`:
 
 ```powershell
-npm install
 npm run dev
 ```
 
-Open the loopback URL printed by Vite, normally http://127.0.0.1:5173. The static scaffold page needs no backend. Commit the generated package lock after approved installation.
+Open http://127.0.0.1:5173 in your browser on this computer. Keep both terminals running. The frontend and backend bind only to loopback; the frontend calls `/api/health` through Vite's local proxy to `127.0.0.1:8000`. If the backend port changes, update the proxy target in `frontend/vite.config.ts` as well. A port already in use produces an explicit error rather than silently choosing another port.
+
+The HUD includes an animated core, session conversation, activity history, system status, date/time in your browser's timezone, and a command input. Health checks run immediately and every 10 seconds, with a 4-second timeout and a manual refresh control. Connection failures and reconnections are shown honestly.
+
+There is no messaging API or model yet: typed messages stay in React memory and are labeled **Saved locally · Not sent to AI**. Conversation history clears on page reload; activity history keeps the latest 50 session events. No generated assistant replies are displayed. The microphone button is disabled with an explanation, and the waveform is a static inactive display, not a microphone signal. Workstation specifications come from the labeled Phase 0 report, not live telemetry. Reduced-motion preferences disable decorative animation.
 
 Type-check and build, then preview the output:
 
@@ -89,6 +92,16 @@ npm run build
 npm run preview
 ```
 
-The build checks TypeScript before bundling. Frontend build and browser behavior remain unverified until dependencies are approved and installed.
+The build checks TypeScript before bundling. Preview runs at http://127.0.0.1:4173 and uses the same local API proxy. This is a local browser dashboard, not a packaged native executable; no desktop wrapper was added.
+
+Run browser tests from `frontend/`:
+
+```powershell
+npm test
+```
+
+Playwright starts local servers when necessary, reuses existing servers, and closes servers it started. Tests verify the real FastAPI connection, typed history, honest unavailable capabilities, loading/error/timeout states, automatic reconnection, and responsive layouts from 320 to 1440 pixels. Error scenarios use test-only intercepted responses. Desktop and mobile screenshots are written to ignored `frontend/test-results/`.
+
+For a fresh checkout, obtain dependency/download approval before `npm ci` and `npx playwright install chromium`. The lockfile records frontend dependencies. Browser binaries use Playwright's normal local user cache. No external fonts, assets, or paid services are required at runtime.
 
 See [architecture](docs/ARCHITECTURE.md) and [roadmap](docs/ROADMAP.md).
