@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from backend.config import Settings
 from backend.core.assistant import Assistant
+from backend.core.providers import ModelStatus
 from backend.main import create_app
 
 
@@ -19,6 +20,14 @@ class SettingsTests(unittest.TestCase):
         with patch.dict("os.environ", {"JARVIS_HOST": "::1", "JARVIS_PORT": "8123",
                                        "JARVIS_LOG_LEVEL": "warning"}, clear=True):
             self.assertEqual(Settings.from_env(), Settings("::1", 8123, "warning"))
+
+    def test_model_environment_overrides(self):
+        with patch.dict("os.environ", {"JARVIS_MODEL": "qwen3:1.7b", "JARVIS_CONTEXT_WINDOW": "2048",
+                                       "JARVIS_MAX_OUTPUT_TOKENS": "256"}, clear=True):
+            settings = Settings.from_env()
+            self.assertEqual(settings.model, "qwen3:1.7b")
+            self.assertEqual(settings.context_window, 2048)
+            self.assertEqual(settings.max_output_tokens, 256)
 
     def test_rejects_nonlocal_hosts(self):
         for host in ["0.0.0.0", "192.168.1.5", "example.com", "::"]:
@@ -34,15 +43,26 @@ class SettingsTests(unittest.TestCase):
                         Settings.from_env()
 
 
+class UnavailableProvider:
+    async def status(self):
+        return ModelStatus(False, "ollama_unavailable", "Ollama is unavailable.")
+
+    async def close(self):
+        pass
+
+
 class APITests(unittest.TestCase):
     def setUp(self):
-        self.app = create_app(Settings())
+        self.app = create_app(Settings(), UnavailableProvider())
         self.client = self.enterContext(TestClient(self.app, raise_server_exceptions=False))
 
     def test_health(self):
         response = self.client.get("/health")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {"status": "ok", "service": "JARVIS", "ai_connected": False})
+        self.assertEqual(response.json()["status"], "ok")
+        self.assertFalse(response.json()["ai_connected"])
+        self.assertEqual(response.json()["model"], "qwen3:4b")
+        self.assertEqual(response.json()["ai_status"], "ollama_unavailable")
 
     def test_http_errors(self):
         for method, path, status in [("GET", "/missing", 404), ("POST", "/health", 405)]:

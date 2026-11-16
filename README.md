@@ -1,6 +1,6 @@
 # JARVIS
 
-Personal AI assistant project built incrementally. Current scope: local FastAPI backend and responsive React desktop dashboard. AI, speech, automation, persistent memory, and external integrations are not implemented.
+Personal AI assistant project built incrementally. Current scope: local Ollama conversation brain, streaming FastAPI chat, and responsive React dashboard. Voice, computer control, automation, and persistent memory are not implemented.
 
 This repository is the JARVIS root; no nested JARVIS directory is needed.
 
@@ -9,17 +9,17 @@ This repository is the JARVIS root; no nested JARVIS directory is needed.
 | Directory | Purpose |
 | --- | --- |
 | backend/ | Independent Python backend package |
-| backend/core/ | Future coordination and shared contracts |
+| backend/core/ | Assistant coordination, personality, context policy, and provider contract |
 | backend/voice/ | Future audio and speech adapters |
 | backend/memory/ | Future persistence interfaces and implementations |
 | backend/automation/ | Future user-authorized action workflows |
 | backend/tools/ | Future narrowly scoped assistant capabilities |
-| backend/integrations/ | Future model runtime and external service adapters |
+| backend/integrations/ | Local Ollama adapter and provider factory |
 | backend/tests/ | Backend tests |
 | frontend/ | Independent React, TypeScript, and Vite dashboard |
 | frontend/src/components/ | Reusable UI elements |
 | frontend/src/pages/ | Page-level views |
-| frontend/src/services/ | Typed backend health client |
+| frontend/src/services/ | Typed health client and streamed chat transport |
 | frontend/src/hooks/ | Reusable React hooks |
 | frontend/src/styles/ | Shared CSS |
 | data/ | Local runtime data, ignored by Git except its placeholder |
@@ -47,7 +47,7 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r backend/tests/requirements.txt
 ```
 
-For runtime-only dependencies use `-r requirements.txt`. HTTPX is test-only. No environment activation or execution-policy change is needed.
+For runtime-only dependencies use `-r requirements.txt`. The already-installed HTTPX now also handles Ollama requests; no new package installation was needed for the AI brain. No environment activation or execution-policy change is needed.
 
 Start the backend:
 
@@ -61,7 +61,13 @@ The server binds to `127.0.0.1:8000`. Stop it with Ctrl+C. To choose another loc
 - Offline API documentation: http://127.0.0.1:8000/docs
 - OpenAPI schema: http://127.0.0.1:8000/openapi.json
 
-Documentation makes no CDN requests. Health reports backend liveness with `ai_connected: false`; it does not claim AI readiness. See [API reference](docs/API.md) for responses and error handling.
+Documentation makes no CDN requests. Health always distinguishes backend liveness from model availability: `ai_connected`, `provider`, `model`, `ai_status`, and `ai_message` reflect local Ollama discovery. Availability means the model is installed and the service is reachable, not that inference has been verified. See [API reference](docs/API.md).
+
+## Local AI brain
+
+The default is **qwen3:4b**, following the hardware report's preferred small quantized model range, with a 4096-token context and 512-token output limit. Set `$env:JARVIS_MODEL = "another-installed-model"` before backend startup to change models. Model/provider settings and timeouts are documented in `.env.example` and [Ollama setup](docs/OLLAMA_SETUP.md). Restart after changing configuration. All Ollama requests use a validated loopback HTTP origin; JARVIS never downloads models automatically.
+
+**Current setup limit:** Ollama was not reachable on November 16, 2026. The machine's Windows build and NVIDIA driver are below current Ollama prerequisites. Actual AI communication remains untested. Follow the compatibility review and approval-dependent setup steps in [OLLAMA_SETUP.md](docs/OLLAMA_SETUP.md) before installing anything or downloading a model.
 
 Run backend automated tests without starting a separate server:
 
@@ -83,7 +89,9 @@ Open http://127.0.0.1:5173 in your browser on this computer. Keep both terminals
 
 The HUD includes an animated core, session conversation, activity history, system status, date/time in your browser's timezone, and a command input. Health checks run immediately and every 10 seconds, with a 4-second timeout and a manual refresh control. Connection failures and reconnections are shown honestly.
 
-There is no messaging API or model yet: typed messages stay in React memory and are labeled **Saved locally · Not sent to AI**. Conversation history clears on page reload; activity history keeps the latest 50 session events. No generated assistant replies are displayed. The microphone button is disabled with an explanation, and the waveform is a static inactive display, not a microphone signal. Workstation specifications come from the labeled Phase 0 report, not live telemetry. Reduced-motion preferences disable decorative animation.
+Typed messages now call `POST /api/chat`, proxied to backend `/chat`, and model text appears as it streams. Stop cancels the request. Recent successfully completed question/answer pairs are sent with follow-up questions; failed, cancelled, and partial turns remain visible but are excluded from context. Transcripts live only in browser memory and clear on reload. Backend restart alone does not erase the open page's context; reloading it does. Activity history keeps the latest 50 session events. Provider errors are shown explicitly without generated fallback replies.
+
+JARVIS's system personality is professional, conversational, helpful, and instructed to admit uncertainty and capability limits. Model output can still be wrong. No tools or computer control are exposed. The microphone remains disabled, the waveform is a static inactive display, and workstation specifications are the Phase 0 snapshot. Reduced-motion preferences disable decorative animation.
 
 Type-check and build, then preview the output:
 
@@ -100,7 +108,7 @@ Run browser tests from `frontend/`:
 npm test
 ```
 
-Playwright starts local servers when necessary, reuses existing servers, and closes servers it started. Tests verify the real FastAPI connection, typed history, honest unavailable capabilities, loading/error/timeout states, automatic reconnection, and responsive layouts from 320 to 1440 pixels. Error scenarios use test-only intercepted responses. Desktop and mobile screenshots are written to ignored `frontend/test-results/`.
+Playwright starts local servers when necessary, reuses existing servers, and closes servers it started. Restart any older running backend before testing new code. Tests cover the real health connection, missing-provider behavior, streamed chat/context, stop/error states, reconnection, and responsive layouts. Chat replies in browser tests are test-only intercepted streams, not live model inference. Screenshots are written to ignored `frontend/test-results/`.
 
 For a fresh checkout, obtain dependency/download approval before `npm ci` and `npx playwright install chromium`. The lockfile records frontend dependencies. Browser binaries use Playwright's normal local user cache. No external fonts, assets, or paid services are required at runtime.
 

@@ -1,0 +1,7 @@
+# Optional Phase 2 dependencies. Installing these does not download model weights.
+openwakeword==0.6.0
+faster-whisper>=1.1,<2
+numpy>=1.26,<3
+scipy>=1.12,<2
+onnxruntime>=1.18,<2
+websockets>=13,<16

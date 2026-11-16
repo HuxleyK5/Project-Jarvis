@@ -4,8 +4,11 @@ from backend.core.brain import Brain
 
 
 class Assistant:
-    def __init__(self, brain: Brain | None = None) -> None:
-        self.brain = brain if brain is not None else Brain()
+    def __init__(self, brain: Brain) -> None:
+        self.brain = brain
 
-    def health(self) -> dict[str, str | bool]:
-        return {"status": "ok", "service": "JARVIS", "ai_connected": self.brain.connected}
+    async def health(self) -> dict[str, str | bool]:
+        status = await self.brain.provider.status()
+        return {"status": "ok", "service": "JARVIS", "ai_connected": status.ready,
+                "provider": self.brain.settings.model_provider, "model": self.brain.settings.model,
+                "ai_status": status.code, "ai_message": status.message}

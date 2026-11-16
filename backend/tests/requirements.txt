@@ -1,3 +1,2 @@
-# TestClient transport; unittest is included with Python.
+# Runtime includes the HTTPX transport; unittest is included with Python.
 -r ../../requirements.txt
-httpx==0.28.1

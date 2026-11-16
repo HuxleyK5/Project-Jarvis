@@ -107,6 +107,22 @@ h2 svg { color: #66bdd5; }
 .message-meta time { font-size: 8px; color: #8ca5b7; }
 .message > p { font-size: 13px; line-height: 1.8; margin: 11px 0; white-space: pre-wrap; }
 .message-state { font-size: 9px; color: #9badbb; }
+.message-assistant { border-left: 2px solid #3a8da8; padding-left: 12px; }
+.message-assistant .user-avatar { color: #b8f2fc; background: #164353; }
+.chat-progress { color: var(--cyan); font-size: 11px; line-height: 1.8; padding: 8px 0; }
+.chat-error { margin: 12px 0; }
+.stop-button { padding: 10px; background: #352b20; color: #f4cf99; border: 1px solid #746044; border-radius: 4px; font-size: 10px; white-space: nowrap; }
+.system-row strong { overflow-wrap: anywhere; }
+.voice-controls { border: 1px solid var(--border); border-radius: 7px; background: #0b1620; padding: 18px 20px; margin-top: 18px; }
+.voice-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.voice-controls p { font-size: 11px; color: #a0b7c8; line-height: 1.8; margin: 12px 0; }
+.voice-controls label { display: flex; align-items: flex-start; gap: 10px; font-size: 12px; line-height: 1.7; color: #c3d7e4; margin: 12px 0; }
+.voice-controls input { accent-color: var(--cyan); margin: 4px 0 0; }
+.voice-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.voice-actions button { padding: 10px 14px; background: #143c4d; border: 1px solid #3b748b; border-radius: 4px; color: #b9eefb; font-size: 11px; }
+.voice-actions button:disabled { opacity: .4; }
+.voice-controls .voice-error { color: #edc48b; }
+.recognized-speech { overflow-wrap: anywhere; }
 .system-panel { grid-column: 3; grid-row: 1 / 3; }
 .icon-button { padding: 5px; background: transparent; color: #9bbccc; border-radius: 4px; display: grid; place-items: center; }
 .icon-button:hover { color: var(--cyan); background: #173140; }
