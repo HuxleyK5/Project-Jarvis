@@ -20,6 +20,7 @@ class VoiceSession:
         self.quiet = 0
         self.spoken = False
         self.finished = False
+        self.speech_frames = 0
 
     def process(self, pcm: bytes) -> list[dict]:
         if len(pcm) != FRAME_SAMPLES * 2:
@@ -35,7 +36,8 @@ class VoiceSession:
         samples = struct.unpack("<1280h", pcm)
         rms = math.sqrt(sum(value * value for value in samples) / FRAME_SAMPLES)
         if rms >= self.settings.speech_rms:
-            self.spoken = True
+            self.speech_frames += 1
+            self.spoken = self.speech_frames >= 3  # Ignore isolated clicks/spikes.
             self.quiet = 0
         else:
             self.quiet += 1

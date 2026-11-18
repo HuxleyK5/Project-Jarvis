@@ -5,7 +5,7 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlsplit
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
 
 from backend.voice.config import VoiceSettings
 from backend.voice.engines import FasterWhisperRecognizer, OpenWakeWordDetector, VoiceError, availability
@@ -36,14 +36,18 @@ router = APIRouter(prefix="/voice", tags=["Voice"])
 
 
 @router.get("/status")
-async def voice_status():
-    return availability(VoiceSettings.from_env())
+async def voice_status(request: Request):
+    return availability(request.app.state.voice.settings)
 
 
 @router.websocket("/listen")
 async def listen(socket: WebSocket):
-    origin = urlsplit(socket.headers.get("origin", ""))
-    if origin.scheme != "http" or origin.hostname not in {"127.0.0.1", "localhost", "::1"} or origin.port not in {5173, 4173, socket.app.state.settings.port}:
+    try:
+        origin = urlsplit(socket.headers.get("origin", ""))
+        valid_origin = origin.scheme == "http" and origin.hostname in {"127.0.0.1", "localhost", "::1"} and origin.port in {5173, 4173, socket.app.state.settings.port}
+    except ValueError:
+        valid_origin = False
+    if not valid_origin:
         await socket.close(code=1008, reason="Only the local dashboard may open voice capture")
         return
     await socket.accept()
@@ -71,7 +75,11 @@ async def listen(socket: WebSocket):
             if message["type"] == "websocket.disconnect":
                 break
             if message.get("text") is not None:
+                if len(message["text"]) > 1024:
+                    raise VoiceError("Voice control message is too large")
                 command = json.loads(message["text"])
+                if not isinstance(command, dict):
+                    raise VoiceError("Invalid voice command")
                 if command.get("type") == "stop":
                     break  # Stop discards, never transcribes unsubmitted audio.
                 if command.get("type") != "finish" or not session.capturing:
@@ -100,7 +108,11 @@ async def listen(socket: WebSocket):
                     if resume["type"] == "websocket.disconnect":
                         return
                     if resume.get("text"):
+                        if len(resume["text"]) > 1024:
+                            raise VoiceError("Voice control message is too large")
                         command = json.loads(resume["text"])
+                        if not isinstance(command, dict):
+                            raise VoiceError("Invalid voice command")
                         if command.get("type") == "stop":
                             return
                         if command.get("type") == "resume":

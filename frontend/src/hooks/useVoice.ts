@@ -46,6 +46,7 @@ export function useVoice(onTranscript: (text: string) => Promise<void>) {
       const context = new AudioContext({ sampleRate: 16000 });
       resources.current.context = context;
       await context.resume();
+      if (!current()) return;
       const response = await fetch('/api/voice/status', { signal: AbortSignal.timeout(5000) });
       if (!response.ok) throw new Error('Voice backend is unavailable. Restart the backend and check voice setup.');
       const status = await response.json();

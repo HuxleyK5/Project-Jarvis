@@ -90,8 +90,8 @@ def create_app(settings: Settings | None = None, provider: ModelProvider | None 
 
     application = FastAPI(
         title="JARVIS Local API",
-        version="0.2.0",
-        description="Local Ollama conversation API. No voice or computer control.",
+        version="0.3.0",
+        description="Local Ollama chat and opt-in voice input. No spoken responses or computer control.",
         docs_url=None,
         redoc_url=None,
         lifespan=lifespan,
@@ -181,8 +181,13 @@ def create_app(settings: Settings | None = None, provider: ModelProvider | None 
     async def documentation():
         # Self-contained documentation avoids third-party CDN requests.
         return """<!doctype html><html lang="en"><meta charset="utf-8">
-<title>JARVIS API documentation</title><main><h1>JARVIS Local API v0.2.0</h1>
-<p>Local Ollama conversations. No voice or computer control. No automatic model downloads.</p>
+<title>JARVIS API documentation</title><main><h1>JARVIS Local API v0.3.0</h1>
+<p>Local Ollama conversations and opt-in voice input. No spoken responses, computer control, or automatic model downloads.</p>
+<h2>Voice</h2><p>GET /voice/status reports local dependency/asset readiness without loading models.
+WebSocket /voice/listen requires a local dashboard Origin and an initial consent=true message with mode manual or wake.
+Audio is mono PCM16 at 16kHz, exactly 1280 samples per frame. Server events: state, transcript, no_speech, error.
+Controls: finish (transcribe current utterance), stop (discard and close), resume (wake mode after chat).
+All audio remains in bounded memory; no audio files are saved. See docs/VOICE_SETUP.md in the repository.</p>
 <h2>GET /health</h2><p>Backend liveness. Returns HTTP 200:</p>
 <p>Includes ai_connected, provider, model, ai_status, and ai_message. AI readiness means the local service is reachable and the selected model is installed; not that inference has been verified.</p>
 <p><a href="/health">Open health check</a></p>

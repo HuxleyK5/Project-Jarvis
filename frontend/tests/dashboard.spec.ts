@@ -10,7 +10,8 @@ test('connects to the real backend and reports actual model availability', async
   expect(typeof health.ai_connected).toBe('boolean');
   await page.goto('/');
   await expect(page.locator('.connection-badge')).toHaveText('Backend online');
-  await expect(page.getByRole('button', { name: /Microphone unavailable/ })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Start microphone' })).toBeEnabled();
+  await expect(page.getByRole('checkbox', { name: /I allow in-memory/ })).not.toBeChecked();
   const send = page.getByRole('button', { name: 'Send message to JARVIS' });
   await expect(send).toBeDisabled();
   await page.getByRole('textbox', { name: 'Message JARVIS' }).fill('   ');

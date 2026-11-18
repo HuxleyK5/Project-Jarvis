@@ -33,7 +33,7 @@ def availability(settings: VoiceSettings) -> dict:
     return {"manual_available": dependencies and stt, "wake_available": dependencies and wake_dependencies and wake and stt,
             "wake_phrase": settings.wake_phrase, "sample_rate": SAMPLE_RATE, "frame_samples": FRAME_SAMPLES,
             "message": "Local voice assets present; microphone access still requires session consent."
-            if dependencies and wake and stt else "Voice dependencies or local models are missing. See docs/VOICE_SETUP.md. No downloads occur automatically."}
+            if dependencies and wake_dependencies and wake and stt else "Voice dependencies or local models are missing. See docs/VOICE_SETUP.md. No downloads occur automatically."}
 
 
 class OpenWakeWordDetector:
