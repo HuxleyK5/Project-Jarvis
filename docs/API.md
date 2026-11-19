@@ -1,6 +1,6 @@
-# JARVIS Local API v0.2.0
+# JARVIS Local API v0.4.0
 
-Start with `python -m backend.main` using the project virtual environment. Default base URL: `http://127.0.0.1:8000`. Ollama is the local text provider; voice and computer control are not implemented. JARVIS never pulls models. See [Ollama setup](OLLAMA_SETUP.md).
+Start with `python -m backend.main` using the project virtual environment. Default base URL: `http://127.0.0.1:8000`. Ollama is the local text provider; voice input is optional and consent-gated; Piper output is optional; computer control is not implemented. JARVIS never pulls models. See [Ollama setup](OLLAMA_SETUP.md).
 
 | Method | Path | Result |
 | --- | --- | --- |
@@ -56,3 +56,21 @@ Error envelope:
 Unknown routes return 404. Unsupported methods return 405 with the Allow header. Invalid request data returns 422 with code `validation_error` and message `Invalid request data`. Unexpected failures return 500 with code `internal_error` and message `Internal server error`. Internal exception details are logged locally and not returned. Health takes no parameters; validation handling is exercised through a test-only route.
 
 Implementation references: official FastAPI [error handling](https://fastapi.tiangolo.com/tutorial/handling-errors/) and [testing](https://fastapi.tiangolo.com/tutorial/testing/) guidance, [Uvicorn settings](https://uvicorn.dev/settings/), and Ollama [chat](https://docs.ollama.com/api/chat), [model discovery](https://docs.ollama.com/api/tags), and [streaming](https://docs.ollama.com/api/streaming). The launcher explicitly binds to loopback and disables proxy-header interpretation.
+
+## Phase 2 voice API
+
+`GET /voice/status` reports `manual_available`, `wake_available`, `wake_phrase`, `sample_rate` (16000), `frame_samples` (1280), and a setup `message`. It does not load models or open microphones. Availability is dependency/file presence, not proof of inference compatibility.
+
+`WS /voice/listen` requires a local dashboard Origin (HTTP localhost/127.0.0.1/::1 on 5173, 4173, or the configured backend port) and an initial JSON message `{"consent":true,"mode":"manual"}` or mode `wake`. No model work or audio is accepted before consent. Only one voice session may run at a time. Send binary 2560-byte frames containing mono, little-endian PCM16 at 16kHz. The server emits `state`, `transcript` (text), `no_speech` (message), and `error` (message) JSON events. Transcript text is then submitted by the dashboard to the existing chat endpoint.
+
+Control messages: `{"type":"finish"}` ends the current utterance for transcription; `{"type":"stop"}` discards unfinished audio and closes; `{"type":"resume"}` resumes wake mode after a transcript/chat cycle. No audio is queued for another command while paused. Disconnects clear session buffers. Missing voice extras/assets return an error event rather than a transcript; the existing HTTP API remains available without them. Uvicorn needs the optional WebSocket transport for live browser voice, which has not been installed in this increment.
+
+See [VOICE_SETUP.md](VOICE_SETUP.md) for privacy behavior, model licensing, asset setup, and test limits.
+
+## Piper output API
+
+`GET /speech/status` returns `available`, `voice`, and `message`, based on installed Piper metadata and local model/config existence. It performs no model download or synthesis.
+
+`POST /speech/synthesize` accepts a JSON text field with 1-1000 nonblank characters; extra fields such as model paths are rejected. Successful replies are `audio/wav` with `Cache-Control: no-store`. Missing setup returns HTTP 503, a busy native job returns 429, synthesis failure returns 502, and a 60-second deadline returns 504, using the standard JSON error envelope. Audio is generated in memory. The browser owns playback, output routing, and interruption. See [SPEECH_OUTPUT.md](SPEECH_OUTPUT.md).
+
+The voice socket also accepts `{"type":"ping"}` control messages so playback pauses do not require forwarding microphone audio. Wake acknowledgements are displayed separately from AI-generated replies and do not change the chat request contract.

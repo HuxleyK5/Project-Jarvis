@@ -80,6 +80,8 @@ async def listen(socket: WebSocket):
                 command = json.loads(message["text"])
                 if not isinstance(command, dict):
                     raise VoiceError("Invalid voice command")
+                if command.get("type") == "ping":
+                    continue  # Keep a consented session alive while Piper plays; no audio buffering.
                 if command.get("type") == "stop":
                     break  # Stop discards, never transcribes unsubmitted audio.
                 if command.get("type") != "finish" or not session.capturing:

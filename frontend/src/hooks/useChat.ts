@@ -8,6 +8,7 @@ export interface ChatMessage {
   time: Date;
   state: 'sending' | 'complete' | 'failed' | 'stopped';
   source?: 'text' | 'voice';
+  acknowledgement?: boolean;
 }
 
 export function useChat() {
@@ -48,6 +49,7 @@ export function useChat() {
         history.current.splice(0, 2);
       }
       if (mounted.current) setMessages(value => value.map(message => message.id === user.id || message.id === assistantId ? { ...message, state: 'complete' } : message));
+      return answer;
     } catch (reason) {
       if (mounted.current) {
         const stopped = current.signal.aborted && !timedOut;
@@ -64,5 +66,8 @@ export function useChat() {
     }
   }
 
-  return { messages, busy, error, send, stop: () => controller.current?.abort() };
+  function acknowledge(text: string) {
+    setMessages(value => [...value, { id: ++sequence.current, role: 'assistant', text, time: new Date(), state: 'complete', acknowledgement: true }]);
+  }
+  return { messages, busy, error, send, acknowledge, stop: () => controller.current?.abort() };
 }

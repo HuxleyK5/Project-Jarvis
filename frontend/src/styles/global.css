@@ -123,6 +123,10 @@ h2 svg { color: #66bdd5; }
 .voice-actions button:disabled { opacity: .4; }
 .voice-controls .voice-error { color: #edc48b; }
 .recognized-speech { overflow-wrap: anywhere; }
+.speech-settings { display: flex; flex-wrap: wrap; gap: 12px 24px; }
+.speech-settings label { display: flex; flex-direction: column; min-width: 0; }
+.speech-settings select { max-width: 100%; background: #102532; border: 1px solid #31566a; color: #c4e4ef; padding: 8px; border-radius: 4px; }
+.speech-settings input[type=range] { max-width: 100%; }
 .system-panel { grid-column: 3; grid-row: 1 / 3; }
 .icon-button { padding: 5px; background: transparent; color: #9bbccc; border-radius: 4px; display: grid; place-items: center; }
 .icon-button:hover { color: var(--cyan); background: #173140; }

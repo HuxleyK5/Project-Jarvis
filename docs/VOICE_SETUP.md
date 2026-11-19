@@ -4,7 +4,7 @@
 
 The user explicitly chose **no dependency installation** and **no voice model downloads** for this increment. The code is implemented, but actual wake-word recognition and Faster-Whisper inference are not enabled or verified on this computer. The backend remains usable for typed chat without voice extras. Missing dependencies/models produce an actionable setup message, never a fabricated transcript.
 
-Tests use injected models and synthetic audio, not physical microphones or personal recordings. No microphone was opened, no audio was saved, no model was downloaded, and no system settings were changed during implementation. Previous device inspection found virtual NDI inputs; a working physical microphone remains unverified.
+Tests use injected models and synthetic audio, not physical microphones or personal recordings. No physical microphone was opened, no personal audio was saved, no model was downloaded, and no system settings were changed during implementation. Previous device inspection found virtual NDI inputs; a working physical microphone remains unverified.
 
 ## Audio flow
 
@@ -14,7 +14,7 @@ Tests use injected models and synthetic audio, not physical microphones or perso
 4. Manual mode bypasses wake detection. Wake mode processes audio with the pretrained **Hey JARVIS** detector. After activation, wait for RECORDING before speaking; the wake phrase itself is not included in the utterance buffer.
 5. A bounded utterance ends after approximately 960ms of quiet following speech, after 12 seconds, or when the user clicks **Finish and transcribe**. Five seconds without speech ends capture without running transcription. RMS gating and a short minimum speech duration suppress silence and isolated clicks; they are not a full speech/noise classifier.
 6. Faster-Whisper runs locally on CPU with INT8 using an explicit local model directory and `local_files_only=True`. Recognized text appears under voice controls and as a **YOU · VOICE** chat message when submitted. It uses the existing `/chat` streaming endpoint and the same conversation context as typed messages. If chat is busy or disconnected, recognized text is placed in the input instead.
-7. Manual mode releases microphone tracks as soon as recognition completes. Continuous mode pauses audio forwarding during transcription/chat and resumes wake listening after chat finishes. The browser microphone remains active during that pause until Stop; paused audio is not queued for future recognition.
+7. Manual mode releases microphone tracks as soon as recognition completes. Continuous mode pauses audio forwarding during transcription/chat and optional speech playback, then resumes wake listening after the response finishes. The browser microphone remains active during that pause until Stop; paused audio is not queued for future recognition.
 
 **Stop listening**, unchecking consent, changing continuous mode, or leaving the page closes the socket and releases microphone tracks. Stop discards the unfinished utterance; it does not trigger transcription. A native inference call already executing cannot be forcibly interrupted safely; its bounded in-memory work may finish, but a stopped browser session ignores its result. Stopping listening does not stop an AI response already submitted; use the separate chat Stop control for that.
 
@@ -106,4 +106,6 @@ Once installation and model downloads are separately approved and complete, test
 .\.venv\Scripts\python.exe -m backend.voice.diagnostics speech path\to\command-fixture.wav
 ```
 
-Diagnostics only read supplied files, never open a microphone, never download models, and never write audio. Then perform opt-in dashboard acceptance checks: manual recognition first, wake activation second, follow-up chat third, and Stop/permission revocation last. No spoken responses are implemented.
+Diagnostics only read supplied files, never open a microphone, never download models, and never write audio. Then perform opt-in dashboard acceptance checks: manual recognition first, wake activation second, follow-up chat third, and Stop/permission revocation last. Optional spoken responses are now documented in [SPEECH_OUTPUT.md](SPEECH_OUTPUT.md); this section covers voice input only.
+
+Verification completed November 19, 2026: all 38 backend tests and 15 Chromium browser tests passed; the TypeScript/production build and Python dependency consistency checks passed. Real OpenWakeWord/Faster-Whisper inference and physical-device testing remain unverified because dependency installation and model downloads were declined. The existing non-failing Starlette HTTPX deprecation warning remains.

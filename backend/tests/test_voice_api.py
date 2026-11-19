@@ -64,6 +64,7 @@ class VoiceAPITests(unittest.TestCase):
             with self.client.websocket_connect('/voice/listen', headers=ORIGIN) as socket:
                 socket.send_json({'consent': True, 'mode': 'wake'})
                 self.assertEqual(socket.receive_json()['state'], 'listening')
+                socket.send_json({'type': 'ping'})
                 socket.send_bytes(SPEECH)
                 self.assertEqual(socket.receive_json()['state'], 'recording')
                 for _ in range(3):

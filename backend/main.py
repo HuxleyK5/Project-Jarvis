@@ -19,6 +19,7 @@ from backend.core.providers import ModelError, ModelProvider
 from backend.integrations.provider_factory import create_provider
 from backend.voice.api import VoiceService, router as voice_router
 from backend.voice.config import VoiceSettings
+from backend.voice.tts import SpeechService, SpeechSettings, router as speech_router
 
 logger = logging.getLogger(__name__)
 
@@ -82,16 +83,18 @@ def create_app(settings: Settings | None = None, provider: ModelProvider | None 
         application.state.assistant = Assistant(brain)
         application.state.generation_lock = asyncio.Lock()
         application.state.voice = VoiceService(VoiceSettings.from_env())
+        application.state.speech = SpeechService(SpeechSettings.from_env())
         try:
             yield
         finally:
             application.state.voice.close()
+            application.state.speech.close()
             await brain.provider.close()
 
     application = FastAPI(
         title="JARVIS Local API",
-        version="0.3.0",
-        description="Local Ollama chat and opt-in voice input. No spoken responses or computer control.",
+        version="0.4.0",
+        description="Local Ollama chat with optional voice input and Piper output. No computer control.",
         docs_url=None,
         redoc_url=None,
         lifespan=lifespan,
@@ -99,6 +102,7 @@ def create_app(settings: Settings | None = None, provider: ModelProvider | None 
     )
     application.state.settings = settings
     application.include_router(voice_router)
+    application.include_router(speech_router)
 
     @application.exception_handler(ModelError)
     async def model_error(request: Request, exc: ModelError):
@@ -181,8 +185,13 @@ def create_app(settings: Settings | None = None, provider: ModelProvider | None 
     async def documentation():
         # Self-contained documentation avoids third-party CDN requests.
         return """<!doctype html><html lang="en"><meta charset="utf-8">
-<title>JARVIS API documentation</title><main><h1>JARVIS Local API v0.3.0</h1>
-<p>Local Ollama conversations and opt-in voice input. No spoken responses, computer control, or automatic model downloads.</p>
+<title>JARVIS API documentation</title><main><h1>JARVIS Local API v0.4.0</h1>
+<p>Local Ollama conversations, opt-in voice input and Piper output. No computer control or automatic model downloads.</p>
+<h2>Speech output</h2><p>GET /speech/status checks Piper and local voice assets without synthesis.
+POST /speech/synthesize accepts a text object (1 to 1000 nonblank characters) and returns in-memory audio/wav with Cache-Control: no-store.
+Missing assets return 503, a busy native worker returns 429, synthesis failures return 502, and a generation deadline returns 504.
+Playback, device selection, pause/resume, interruption, and volume/speed controls are owned by the local browser.
+See docs/SPEECH_OUTPUT.md for setup and actual-inference limitations.</p>
 <h2>Voice</h2><p>GET /voice/status reports local dependency/asset readiness without loading models.
 WebSocket /voice/listen requires a local dashboard Origin and an initial consent=true message with mode manual or wake.
 Audio is mono PCM16 at 16kHz, exactly 1280 samples per frame. Server events: state, transcript, no_speech, error.

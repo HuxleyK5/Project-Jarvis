@@ -5,6 +5,8 @@ import { useBackend } from '../hooks/useBackend';
 import { useChat } from '../hooks/useChat';
 import { useVoice } from '../hooks/useVoice';
 import VoiceControls from '../components/VoiceControls';
+import { useSpeech } from '../hooks/useSpeech';
+import SpeechControls from '../components/SpeechControls';
 
 interface Activity { id: number; text: string; time: Date; tone: string }
 const timeLabel = (date: Date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -13,7 +15,8 @@ export default function HomePage() {
   const { connection, health, error, checking, lastChecked, retry } = useBackend();
   const [now, setNow] = useState(new Date());
   const [draft, setDraft] = useState('');
-  const { messages, busy, error: chatError, send, stop } = useChat();
+  const { messages, busy, error: chatError, send, stop, acknowledge } = useChat();
+  const speech = useSpeech();
   const [voiceConsent, setVoiceConsent] = useState(false);
   const [continuous, setContinuous] = useState(false);
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -28,8 +31,15 @@ export default function HomePage() {
       return;
     }
     setActivities(value => [{ id: ++sequence.current, time: new Date(), tone: 'good', text: 'Recognized speech submitted to local chat' }, ...value].slice(0, 50));
-    await send(text, 'voice');
-  });
+    speech.stop();
+    const answer = await send(text, 'voice');
+    if (answer) await speech.speak(answer);
+  }, async () => {
+    const text = 'Yes, how can I help?';
+    acknowledge(text);
+    await speech.speak(text);
+  }, speech.active);
+  function startVoice() { speech.stop(); void voice.start(voiceConsent, continuous); }
   const status = connection === 'checking' ? 'Connecting' : online ? 'Backend online' : 'Backend offline';
 
   useEffect(() => {
@@ -61,8 +71,9 @@ export default function HomePage() {
     const text = draft.trim();
     if (!text || busy || !online) return;
     if (voice.active) voice.stop();
+    speech.stop();
     const time = new Date();
-    void send(text);
+    void send(text).then(answer => { if (answer) return speech.speak(answer); });
     setActivities(value => [{ id: ++sequence.current, text: 'Chat request submitted to local backend', time, tone: 'neutral' }, ...value].slice(0, 50));
     setDraft('');
   }
@@ -96,8 +107,8 @@ export default function HomePage() {
             <section className="panel core-panel" aria-labelledby="core-title">
               <div className="panel-heading"><h2 id="core-title"><Icon name="pulse" size={16} />ASSISTANT CORE</h2><span className="micro-label">JARVIS / 01</span></div>
               <div className="core-stage"><span className="coordinate coordinate-left">SYS.01<br />LOCAL NODE</span><AssistantCore online={online} /><span className="coordinate coordinate-right">NEURAL LINK<br />{health?.ai_connected ? 'CONNECTED' : 'UNAVAILABLE'}</span></div>
-              <div className="core-caption"><span className="eyebrow">J.A.R.V.I.S</span><h3>{busy ? 'Preparing your response' : online ? 'Standing by' : connection === 'checking' ? 'Establishing connection' : 'Awaiting connection'}</h3><p>{health?.ai_connected ? `Local conversation · ${health.model ?? 'Ollama'}` : online ? 'Backend ready. AI model not connected.' : 'Waiting for the local backend.'}</p></div>
-              <div className="waveform-block"><div className="waveform-meta"><span>AUDIO CHANNEL</span><span><span className="tiny-dot" />{voice.active ? voice.state.toUpperCase() : 'INACTIVE'}</span></div><div className="waveform" aria-label={voice.active ? "Live microphone level" : "Audio inactive; no microphone signal"}><span className="waveform-line" />{Array.from({ length: 65 }, (_, index) => <i key={index} style={{ height: `${voice.active ? 3 + Math.min(25, voice.level * 180) * (0.4 + (index % 5) / 6) : index % 5 === 0 ? 10 : index % 3 === 0 ? 6 : 3}px` }} />)}</div><p>No audio input · Voice capabilities are not implemented</p></div>
+              <div className="core-caption"><span className="eyebrow">J.A.R.V.I.S</span><h3>{speech.state === 'playing' ? 'Speaking' : busy ? 'Preparing your response' : online ? 'Standing by' : connection === 'checking' ? 'Establishing connection' : 'Awaiting connection'}</h3><p>{health?.ai_connected ? `Local conversation · ${health.model ?? 'Ollama'}` : online ? 'Backend ready. AI model not connected.' : 'Waiting for the local backend.'}</p></div>
+              <div className="waveform-block"><div className="waveform-meta"><span>AUDIO CHANNEL</span><span><span className="tiny-dot" />{speech.active ? speech.state.toUpperCase() : voice.active ? voice.state.toUpperCase() : 'INACTIVE'}</span></div><div className="waveform" aria-label={speech.active ? "Speech playback waveform" : voice.active ? "Live microphone level" : "Audio inactive; no microphone signal"}><span className="waveform-line" />{Array.from({ length: 65 }, (_, index) => <i key={index} style={{ height: `${(speech.active || voice.active) ? 3 + Math.min(25, (speech.active ? speech.level : voice.level) * 180) * (0.4 + (index % 5) / 6) : index % 5 === 0 ? 10 : index % 3 === 0 ? 6 : 3}px` }} />)}</div><p>{speech.active ? 'Local speech output - Microphone forwarding paused' : voice.active ? 'Microphone active - Local processing - No audio files' : 'Microphone off - Enable voice input below'}</p></div>
               <div className="core-footer"><span><span className={`status-dot ${online ? 'cyan' : 'muted-dot'}`} />{online ? 'API REACHABLE' : 'API NOT VERIFIED'}</span><span>{health?.ai_connected ? 'MODEL CONNECTED' : online ? 'NO MODEL CONNECTED' : 'MODEL STATUS UNKNOWN'}</span></div>
             </section>
 
@@ -105,7 +116,7 @@ export default function HomePage() {
               <div className="panel-heading"><h2 id="conversation-title"><Icon name="message" size={16} />CONVERSATION</h2><span className="counter">{messages.length.toString().padStart(2, '0')}</span></div>
               <div className="conversation-log" role="log" aria-label="Conversation history" aria-live="polite">
                 {messages.length === 0 ? <div className="conversation-empty"><div className="empty-icon"><Icon name="message" size={27} /></div><h3>A space for your thoughts.</h3><p>Type a message below to start your session.</p><span className="notice">{health?.ai_connected ? `Ready to talk with ${health.model ?? 'your local model'}. Recent completed turns provide follow-up context.` : health?.ai_message ?? 'Checking the local AI provider. No model is downloaded automatically.'}</span></div>
-                  : messages.map(message => <article className={`message message-${message.role}`} key={message.id}><div className="message-meta"><span><span className="user-avatar">{message.role === 'user' ? 'Y' : 'J'}</span>{message.role === 'user' ? message.source === 'voice' ? 'YOU ? VOICE' : 'YOU' : 'JARVIS'}</span><time dateTime={message.time.toISOString()}>{timeLabel(message.time)}</time></div><p>{message.text}</p><span className="message-state">{message.state === 'sending' ? message.role === 'assistant' ? 'Streaming response…' : 'Awaiting local AI…' : message.state === 'complete' ? message.role === 'assistant' ? 'Local AI · Complete' : 'Sent to local AI' : message.state === 'stopped' ? 'Stopped · Excluded from context' : 'Incomplete · Excluded from context'}</span></article>)}
+                  : messages.map(message => <article className={`message message-${message.role}`} key={message.id}><div className="message-meta"><span><span className="user-avatar">{message.role === 'user' ? 'Y' : 'J'}</span>{message.role === 'user' ? message.source === 'voice' ? 'YOU · VOICE' : 'YOU' : 'JARVIS'}</span><time dateTime={message.time.toISOString()}>{timeLabel(message.time)}</time></div><p>{message.text}</p><span className="message-state">{message.state === 'sending' ? message.role === 'assistant' ? 'Streaming response…' : 'Awaiting local AI…' : message.state === 'complete' ? message.acknowledgement ? 'Wake acknowledgement' : message.role === 'assistant' ? 'Local AI · Complete' : 'Sent to local AI' : message.state === 'stopped' ? 'Stopped · Excluded from context' : 'Incomplete · Excluded from context'}</span></article>)}
                 {busy && <div className="chat-progress" role="status">{messages.some(message => message.role === 'assistant' && message.state === 'sending') ? 'JARVIS is responding…' : 'Waiting for Ollama. The model may be loading…'}</div>}
                 {chatError && <div className="connection-error chat-error" role="alert">{chatError}</div>}
                 <div ref={logEnd} />
@@ -137,9 +148,11 @@ export default function HomePage() {
             consent={voiceConsent} continuous={continuous} unavailable={!online || busy}
             setConsent={value => { if (!value) voice.stop(); setVoiceConsent(value); }}
             setContinuous={value => { voice.stop(); setContinuous(value); }}
-            start={() => void voice.start(voiceConsent, continuous)} stop={voice.stop} finish={voice.finish} />
+            start={startVoice} stop={voice.stop} finish={voice.finish} />
 
-          <form className="command-bar" onSubmit={submit} aria-label="Command input"><div className="command-entry"><span className="command-symbol" aria-hidden="true">›_</span><label className="sr-only" htmlFor="command">Message JARVIS</label><input id="command" value={draft} onChange={event => setDraft(event.target.value)} maxLength={4000} placeholder="Type a message to JARVIS…" autoComplete="off" /><span className="keyboard-hint">ENTER ↵</span><button className="mic-button" type="button" onClick={() => voice.active ? voice.stop() : void voice.start(voiceConsent, continuous)} disabled={!voice.active && (!online || busy)} aria-label={voice.active ? "Stop microphone" : "Start microphone"} title="Microphone capture requires session consent"><Icon name="mic" /></button>{busy && <button className="stop-button" type="button" onClick={stop} aria-label="Stop response">Stop</button>}<button className="send-button" type="submit" disabled={!draft.trim() || busy || !online} aria-label="Send message to JARVIS"><span>Send</span><Icon name="arrow" size={18} /></button></div><div className="command-note"><span><span className="tiny-dot" />{online ? 'LOCAL BACKEND CONNECTED' : connection === 'checking' ? 'CHECKING LOCAL BACKEND' : 'LOCAL BACKEND UNAVAILABLE'}</span><span>Local AI conversation ? Voice is opt-in ? No spoken responses</span></div></form>
+          <SpeechControls speech={speech} />
+
+          <form className="command-bar" onSubmit={submit} aria-label="Command input"><div className="command-entry"><span className="command-symbol" aria-hidden="true">›_</span><label className="sr-only" htmlFor="command">Message JARVIS</label><input id="command" value={draft} onChange={event => setDraft(event.target.value)} maxLength={4000} placeholder="Type a message to JARVIS…" autoComplete="off" /><span className="keyboard-hint">ENTER ↵</span><button className="mic-button" type="button" onClick={() => voice.active ? voice.stop() : startVoice()} disabled={!voice.active && (!online || busy)} aria-label={voice.active ? "Stop microphone" : "Start microphone"} title="Microphone capture requires session consent"><Icon name="mic" /></button>{busy && <button className="stop-button" type="button" onClick={stop} aria-label="Stop response">Stop</button>}<button className="send-button" type="submit" disabled={!draft.trim() || busy || !online} aria-label="Send message to JARVIS"><span>Send</span><Icon name="arrow" size={18} /></button></div><div className="command-note"><span><span className="tiny-dot" />{online ? 'LOCAL BACKEND CONNECTED' : connection === 'checking' ? 'CHECKING LOCAL BACKEND' : 'LOCAL BACKEND UNAVAILABLE'}</span><span>Local AI conversation - Voice input and speech output are opt-in</span></div></form>
           <footer className="page-footer"><span>JARVIS INTERFACE <b>V.0.1</b></span><span>LOCAL FIRST. ALWAYS YOURS.</span></footer>
         </main>
       </div>

@@ -2,22 +2,27 @@ import { useEffect, useRef, useState } from 'react';
 
 export type VoiceState = 'idle' | 'starting' | 'listening' | 'recording' | 'transcribing' | 'paused';
 
-export function useVoice(onTranscript: (text: string) => Promise<void>) {
+export function useVoice(onTranscript: (text: string) => Promise<void>, onWake?: () => Promise<void>, outputActive = false) {
   const [state, setState] = useState<VoiceState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [transcript, setTranscript] = useState('');
   const [level, setLevel] = useState(0);
   const liveState = useRef<VoiceState>('idle');
-  const resources = useRef<{ stream?: MediaStream; context?: AudioContext; node?: AudioWorkletNode; source?: MediaStreamAudioSourceNode; socket?: WebSocket; gain?: GainNode }>({});
+  const resources = useRef<{ stream?: MediaStream; context?: AudioContext; node?: AudioWorkletNode; source?: MediaStreamAudioSourceNode; socket?: WebSocket; gain?: GainNode; heartbeat?: number }>({});
   const sequence = useRef(0);
   const callback = useRef(onTranscript);
   callback.current = onTranscript;
+  const wakeCallback = useRef(onWake);
+  wakeCallback.current = onWake;
+  const outputBlocked = useRef(outputActive);
+  outputBlocked.current = outputActive;
 
   function change(value: VoiceState) { liveState.current = value; setState(value); }
   function stop() {
     ++sequence.current;
     const value = resources.current;
     resources.current = {};
+    window.clearInterval(value.heartbeat);
     value.node?.disconnect();
     value.source?.disconnect();
     value.gain?.disconnect();
@@ -66,6 +71,9 @@ export function useVoice(onTranscript: (text: string) => Promise<void>) {
       source.connect(node).connect(gain).connect(context.destination);
       const socket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/api/voice/listen`);
       resources.current.socket = socket;
+      resources.current.heartbeat = window.setInterval(() => {
+        if (current() && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'ping' }));
+      }, 10000);
       const readyTimer = window.setTimeout(() => { if (current() && liveState.current === 'starting') { stop(); setError('Voice model loading or connection timed out. Check local voice setup.'); } }, 30000);
       socket.onopen = () => { if (current()) socket.send(JSON.stringify({ consent: true, mode: continuous ? 'wake' : 'manual' })); };
       socket.onmessage = async event => {
@@ -75,7 +83,11 @@ export function useVoice(onTranscript: (text: string) => Promise<void>) {
           if (message.type === 'state') {
             window.clearTimeout(readyTimer);
             if (!['recording', 'listening', 'transcribing', 'paused'].includes(message.state)) throw new Error('Invalid voice state');
-            change(message.state);
+            if (continuous && message.state === 'recording' && liveState.current === 'listening' && wakeCallback.current) {
+              change('paused');
+              await wakeCallback.current();
+              if (current()) change('recording');
+            } else change(message.state);
           } else if (message.type === 'error') {
             stop(); setError(message.message || 'Voice processing failed.');
           } else if (message.type === 'transcript' || message.type === 'no_speech') {
@@ -100,7 +112,7 @@ export function useVoice(onTranscript: (text: string) => Promise<void>) {
       node.port.onmessage = event => {
         if (!current()) return;
         setLevel(event.data.level);
-        if (socket.readyState === WebSocket.OPEN && ['listening', 'recording'].includes(liveState.current)) {
+        if (!outputBlocked.current && socket.readyState === WebSocket.OPEN && ['listening', 'recording'].includes(liveState.current)) {
           if (socket.bufferedAmount > 2560 * 15) { stop(); setError('Audio processing is falling behind. Try manual mode or close other voice sessions.'); return; }
           socket.send(event.data.pcm);
         }
