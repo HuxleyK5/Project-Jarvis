@@ -3,16 +3,31 @@
 from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Depends, Query, Request, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-router = APIRouter(prefix="/memory", tags=["Memory"])
+def no_cache(response: Response):
+    response.headers["Cache-Control"] = "no-store"
+
+
+router = APIRouter(prefix="/memory", tags=["Memory"], dependencies=[Depends(no_cache)])
 
 
 class MemorySettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
     enabled: bool
     save_history: bool = False
+    approved: bool = False
+    recall_history: bool = False
+
+
+class AssistantStyle(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    tone: Literal['professional', 'friendly', 'formal'] = 'professional'
+    detail: Literal['balanced', 'concise', 'detailed'] = 'balanced'
+
+
+class ApprovedStyle(AssistantStyle):
     approved: bool = False
 
 
@@ -37,7 +52,17 @@ def settings(request: Request):
 
 @router.put("/settings")
 def configure(body: MemorySettings, request: Request):
-    return request.app.state.memory.configure(body.enabled, body.save_history, body.approved)
+    return request.app.state.memory.configure(body.enabled, body.save_history, body.approved, body.recall_history)
+
+
+@router.get('/personality')
+def personality(request: Request):
+    return request.app.state.memory.personality()
+
+
+@router.put('/personality')
+def save_personality(body: ApprovedStyle, request: Request):
+    return request.app.state.memory.save_personality(body.model_dump(exclude={'approved'}), body.approved)
 
 
 @router.get("/entries")

@@ -1,6 +1,6 @@
 # JARVIS
 
-Personal AI assistant project built incrementally. Current scope: local Ollama conversation brain, streaming FastAPI chat, and responsive React dashboard. Phase 2 adds opt-in local voice input; optional Piper voice output is now implemented. Computer control, automation, and persistent memory are not implemented.
+Personal AI assistant project built incrementally. Current scope: local Ollama conversation brain, streaming FastAPI chat, and responsive React dashboard. Phase 2 adds opt-in local voice input; optional Piper voice output is implemented. Phase 3 adds opt-in SQLite memory. Phase 4 adds predefined permission-controlled computer tools; autonomous automation remains outside scope.
 
 This repository is the JARVIS root; no nested JARVIS directory is needed.
 
@@ -11,9 +11,9 @@ This repository is the JARVIS root; no nested JARVIS directory is needed.
 | backend/ | Independent Python backend package |
 | backend/core/ | Assistant coordination, personality, context policy, and provider contract |
 | backend/voice/ | Optional wake detection, speech recognition, consent-gated audio sessions, and diagnostics |
-| backend/memory/ | Future persistence interfaces and implementations |
+| backend/memory/ | SQLite manager, approval/privacy guard, search, and management API |
 | backend/automation/ | Future user-authorized action workflows |
-| backend/tools/ | Future narrowly scoped assistant capabilities |
+| backend/tools/ | Strict tool catalog, session permissions, approval/cancellation, read-only file tools and Windows launch adapters |
 | backend/integrations/ | Local Ollama adapter and provider factory |
 | backend/tests/ | Backend tests |
 | frontend/ | Independent React, TypeScript, and Vite dashboard |
@@ -89,9 +89,9 @@ Open http://127.0.0.1:5173 in your browser on this computer. Keep both terminals
 
 The HUD includes an animated core, session conversation, activity history, system status, date/time in your browser's timezone, and a command input. Health checks run immediately and every 10 seconds, with a 4-second timeout and a manual refresh control. Connection failures and reconnections are shown honestly.
 
-Typed messages now call `POST /api/chat`, proxied to backend `/chat`, and model text appears as it streams. Stop cancels the request. Recent successfully completed question/answer pairs are sent with follow-up questions; failed, cancelled, and partial turns remain visible but are excluded from context. Transcripts live only in browser memory and clear on reload. Backend restart alone does not erase the open page's context; reloading it does. Activity history keeps the latest 50 session events. Provider errors are shown explicitly without generated fallback replies.
+Typed messages now call `POST /api/chat`, proxied to backend `/chat`, and model text appears as it streams. Stop cancels the request. Recent successfully completed question/answer pairs are sent with follow-up questions; failed, cancelled, and partial turns remain visible but are excluded from context. Temporary transcripts live in browser memory and clear on reload; separately opted-in SQLite archives persist. Backend restart alone does not erase the open page's context; reloading it does. Activity history keeps the latest 50 session events. Provider errors are shown explicitly without generated fallback replies.
 
-JARVIS's system personality is professional, conversational, helpful, and instructed to admit uncertainty and capability limits. Model output can still be wrong. No tools or computer control are exposed. Voice input requires session consent; the waveform shows microphone level only while active. Workstation specifications remain the Phase 0 snapshot. Reduced-motion preferences disable decorative animation.
+JARVIS's system personality is professional, conversational, helpful, and instructed to admit uncertainty and capability limits. Model output can still be wrong. Computer tools require opt-in session permissions and per-action approval in their separate panel. Voice input requires session consent; the waveform shows microphone level only while active. Workstation specifications remain the Phase 0 snapshot. Reduced-motion preferences disable decorative animation.
 
 Type-check and build, then preview the output:
 
@@ -138,3 +138,39 @@ Voice output is off by default. The **VOICE OUTPUT** panel provides enable/disab
 **Piper and its voice were not installed/downloaded, per your decision.** Full application flow is tested with synthetic audio and mocked models; live Piper inference, physical output routing, and a real full voice conversation remain unverified. Existing voice-input model restrictions still apply. Missing speech setup produces clear errors without breaking text chat.
 
 See [SPEECH_OUTPUT.md](docs/SPEECH_OUTPUT.md) for optional requirements, voice asset paths, settings, licensing references, controls, and real acceptance steps. Restart the backend to load `/speech/status` and `/speech/synthesize`. Normal startup and test commands above remain unchanged. No generated audio files are saved.
+
+## Phase 3: local persistent memory
+
+Open **SAVED MEMORY & CONVERSATIONS** in the dashboard. Memory defaults off. Enable it to save reviewed preferences, projects, and facts and supply relevant approved entries to the local AI. Each entry/edit needs explicit approval. A separate history checkbox saves future completed question/answer pairs across restarts until disabled. Save-status notices explain whether each opted-in exchange was stored, skipped as sensitive, or failed to save.
+
+The panel provides search, view, edit, and confirmed deletion. Disabling memory stops saving/retrieval without erasing existing data; saved entries and conversation archives remain viewable/deletable. Temporary chat context still clears on reload, and archives are not automatically promoted into approved facts.
+
+The database is lazy-created at `data/memory.sqlite3` and ignored by Git. Python's built-in SQLite support needs no dependency installation. `JARVIS_MEMORY_DB` can select another local file; `JARVIS_MEMORY_ALLOWED=0` blocks enablement/saving/retrieval. Restart after changing environment settings.
+
+Never store passwords or authentication secrets. Known sensitive patterns are blocked and entire flagged exchanges are skipped, but detection is heuristic and cannot identify every unlabeled secret. The database is local and unencrypted. Review exactly what is being saved and keep history off for sensitive discussions. See [MEMORY.md](docs/MEMORY.md) for storage/privacy limits and API details.
+
+Run the focused persistence/privacy tests from the root:
+
+```powershell
+.\.venv\Scripts\python.exe -B -m unittest discover -s backend/tests -p test_memory.py -v
+```
+
+These tests include an actual backend process stop/restart using an isolated temporary database. No personal memories are enabled or stored during testing. Normal startup and full test commands above are unchanged.
+
+## Conversation continuity and assistant preferences
+
+JARVIS now uses topic-aware memory retrieval, short-follow-up context, and bounded extractive summaries of older completed turns. Unrelated saved preferences are no longer included in every answer. The **SESSION CONTEXT** panel shows temporary source-labelled summary quotes and lets you clear them; summaries are never silently saved as facts or conversation archives.
+
+Use **ASSISTANT PREFERENCES** to choose professional/friendly/formal tone and balanced/concise/detailed answers. Changes are session-only unless memory is enabled and you explicitly approve saving them. In the memory panel, **Recall previous conversations** is a separate, initially off permission. Relevant saved excerpts are then considered only for questions referring to earlier chats; missing records must be acknowledged rather than invented.
+
+SQLite v1 data remains readable; schema v2 adds options on the next authorized write without deleting existing records. Privacy/disable controls remain in effect. See [CONVERSATION.md](docs/CONVERSATION.md) for context limits, retrieval behavior, preferences, migration, and tests. Ollama remains unavailable here, so response quality is not claimed from the deterministic integration tests.
+
+## Phase 4: computer tools
+
+Restart the backend for API v0.7.0 with `.\.venv\Scripts\python.exe -B -m backend.main`; start the independent frontend with `cd frontend` then `npm run dev`. Open `http://127.0.0.1:5173` and expand **COMPUTER TOOLS**.
+
+Tools default off. Approve session permissions for selected local folders, built-in Notepad/Calculator, and exact HTTPS websites. Choose a tool manually or ask local Ollama to propose one. Review its exact inputs, check the separate action approval, and run it. Results appear in the tool panel; transitions appear in Activity History. Manual tools work without Ollama. Ordinary chat does not execute actions.
+
+The registry supports basic system information, directory listing, recursive filename search, selected UTF-8 text reading, and allowlisted Windows app/site opening. File tools never edit or delete documents. Cancellation, approval expiry, revocation and strict schemas are enforced by the backend. Execution metadata is appended to ignored `data/tool-audit.jsonl`; paths, requests and document contents are excluded. No new dependencies or models are needed.
+
+Test with `.\.venv\Scripts\python.exe -B -m unittest discover -s backend/tests -v` from the root, then `npm run build` and `npm test` from `frontend`. See [TOOLS.md](docs/TOOLS.md) for limits, API schemas, independent tool tests, privacy and native-launch/model verification limitations.

@@ -2,7 +2,7 @@
 
 ## Current scope
 
-The local FastAPI backend has an independent React/TypeScript/Vite HUD dashboard and a local Ollama conversation brain. The dashboard streams actual provider responses and maintains conversation/activity in browser-session memory. Optional local voice input is implemented; persistent memory and computer control remain unimplemented. Piper output is now an optional local feature. Actual model inference is unverified on this computer because Ollama is unavailable; see [setup and compatibility](OLLAMA_SETUP.md).
+The local FastAPI backend has an independent React/TypeScript/Vite HUD dashboard and a local Ollama conversation brain. The dashboard streams actual provider responses and maintains conversation/activity in browser-session memory. Optional local voice input, Piper output, opt-in SQLite memory, and predefined approval-controlled computer tools are implemented. Actual model inference is unverified on this computer because Ollama is unavailable; see [setup and compatibility](OLLAMA_SETUP.md).
 
 Backend and frontend have independent dependencies and run lifecycles. Root `requirements.txt` owns Python runtime dependencies; `backend/tests/requirements.txt` adds test dependencies. `frontend/package.json` owns frontend dependencies. Neither imports the other's source. The current API contract is described in [API.md](API.md).
 
@@ -16,7 +16,9 @@ Backend and frontend have independent dependencies and run lifecycles. Root `req
 - `integrations/`: model runtime and external service adapters.
 - `tests/`: backend behavior verification.
 
-Core contains Assistant health coordination, Brain conversation/context policy, the server-owned personality, and a ModelProvider protocol. The provider factory in integrations selects the Ollama adapter. Brain depends on the protocol rather than an Ollama transport. OllamaProvider owns HTTPX communication, model discovery, stream parsing, and provider-specific errors. Other capability packages reserve responsibilities, not working features.
+Core contains Assistant health coordination, Brain conversation/context policy, the server-owned personality, and a ModelProvider protocol. The provider factory in integrations selects the Ollama adapter. Brain depends on the protocol rather than an Ollama transport. OllamaProvider owns HTTPX communication, model discovery, stream parsing, and provider-specific errors. The automation package still reserves future responsibilities.
+
+`tools/registry.py` owns the fixed capability catalog, strict schemas, session allowlists, path boundaries, pending proposals, cooperative workers, results and metadata audit. `tools/api.py` owns same-origin/loopback request protection, session tokens, explicit permission/action approval, polling and cancellation. `Brain.select_tool` can propose one tool through the existing provider; registry validation and dashboard approval remain independent of model output. `ToolPanel.tsx` displays permissions, manual/AI proposals, exact action previews and escaped results, and forwards metadata transitions into the existing activity feed. File data is never injected into model context or saved as memory by this subsystem. See [TOOLS.md](TOOLS.md).
 
 ## Frontend boundaries
 
@@ -32,7 +34,7 @@ Vite proxies same-origin `/api/*` to `http://127.0.0.1:8000/*`, including health
 
 Health polls every 10 seconds, times out after 4 seconds, and cancels pending work on cleanup. Loss of connection clears stale model status. `useChat.ts` serializes user sends, tracks streaming/complete/failed/stopped states, and aborts on Stop, page cleanup, or its 180-second deadline. `services/chat.ts` incrementally decodes UTF-8 NDJSON, requires a done event, and surfaces partial failures. Messages are React text nodes, not interpreted HTML. Audio and resource telemetry are not simulated. Date/time uses the browser clock. Hardware data is explicitly the Phase 0 snapshot. Activity history is bounded to 50 events, and all conversation/activity state clears on reload.
 
-The frontend keeps up to 10 completed pairs and 30000 context characters for request construction, plus the latest question; only completed exchanges enter that context. The backend further bounds recent whole pairs for the configured model window. Full visible session history can outlast the shorter model-context window; follow-ups about older omitted turns may require restating information. Request validation rejects client system roles, invalid ordering, and oversized content. There is no server-side session store or durable memory.
+The frontend keeps up to 10 completed pairs and 30000 context characters for request construction, plus the latest question; only completed exchanges enter that context. The backend further bounds recent whole pairs for the configured model window. Full visible session history can outlast the shorter model-context window; follow-ups about older omitted turns may require restating information. Request validation rejects client system roles, invalid ordering, and oversized content. There is no server-side temporary-session store. Durable SQLite memory is a separate opt-in subsystem described below.
 
 ## Supporting directories
 
@@ -42,7 +44,7 @@ The frontend keeps up to 10 completed pairs and 30000 context characters for req
 
 Backend configuration stays separate from public browser configuration. `config.py` reads and validates JARVIS_HOST, JARVIS_PORT, and JARVIS_LOG_LEVEL from process environment variables using a frozen dataclass. Environment files are not automatically loaded. Never expose secrets in source or `VITE_` variables. Examples contain only nonsecret values. Ignore rules reduce accidental commits; review files before committing.
 
-Microphone access is session-consent-gated and browser-controlled. No shell execution, credential handling, or computer control is implemented. Potentially destructive or security-sensitive features require explicit approval before implementation.
+Microphone access is session-consent-gated and browser-controlled. Computer control uses a fixed catalog and explicit per-action approval, with no arbitrary shell execution, document modification, or credential tool. Destructive capabilities and autonomous workflows are outside scope.
 
 ## Hardware decisions
 
@@ -73,3 +75,17 @@ The Vite proxy enables WebSocket upgrades for `/api/voice/listen`. Voice depende
 `useSpeech.ts` owns one Web Audio playback graph, analyser-based level metering, output sink selection, volume/speed, pause/resume, Stop/replay, and stale-request suppression. It processes response chunks sequentially rather than creating overlapping sources. `SpeechControls.tsx` exposes session-only opt-in controls. `useChat` returns only completed answers for synthesis; wake acknowledgements are explicitly labeled display messages excluded from AI context. `useVoice` awaits wake acknowledgement/reply playback before capture resumes and blocks microphone forwarding while speech output is active. Audio-free heartbeat controls keep the consented socket alive during playback.
 
 Optional Piper requirements are isolated in `backend/voice/tts-requirements.txt`. They and the voice model were not installed/downloaded. See [SPEECH_OUTPUT.md](SPEECH_OUTPUT.md) for output-selection browser limits and real-inference/hardware verification limits. No spoken-response provider fallback or unrelated automation was added.
+
+## Phase 3 memory boundary
+
+`backend/memory/manager.py` owns SQLite settings, approved entries, archived completed pairs, parameterized search, deduplication, and deletion. `privacy.py` applies conservative sensitive-content rejection before persistence. `api.py` exposes explicit approval and confirmation controls. The file is not created at startup or by reads when missing. Connections are short-lived; write transactions recheck consent while serialized. No new dependency or external embedding service is required.
+
+Brain receives an optional manager and adds only bounded relevant approved entries as reference data. The AI cannot create/edit/delete memories through tools. Chat archiving requires both persisted consent and per-request opt-in; only the newly completed pair is written, never the request's full temporary history. A memory status event explains the result before done; failures do not discard a successful AI reply. Conversation archives remain separate and are not automatically injected as facts.
+
+`useMemory.ts`, `services/memory.ts`, and `MemoryPanel.tsx` provide session-safe settings loading, approval reset on edits, search, and confirmed deletion. Memory/history defaults are off. SQLite data is local, unencrypted, ignored by Git, and not remotely synced. Sensitive detection is heuristic, not a guarantee for arbitrary unlabeled secrets. See [MEMORY.md](MEMORY.md) for limits and restart tests.
+
+## Conversation continuity and style
+
+`core/context.py` detects bounded follow-up/archive-reference signals and produces retrieval terms. `core/personality.py` defines validated tone/detail choices. Brain combines recent whole turns, untrusted extractive summary quotes, relevant approved memories, and separately authorized archive excerpts within a shared approximate prompt budget. Facts, user-reported claims, assumptions, and unknowns are distinguished through explicit model policy. No automatic memory writes or tools are introduced.
+
+`services/context.ts` condenses evicted completed browser turns into bounded source-labelled quotes; `useChat` sends that temporary summary independently of archive fields. `useAssistantPreferences` and its component provide session-only style and separately approved persistence. SQLite options add schema v2 without changing existing memory/history rows. Archive retrieval requires both explicit reference intent and the separate recall permission. See [CONVERSATION.md](CONVERSATION.md) for full limits and tests; previous Phase 3 descriptions of unconditional preference priority/no archive injection are superseded by these opt-in relevance rules.

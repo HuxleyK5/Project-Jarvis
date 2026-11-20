@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import AssistantCore from '../components/AssistantCore';
 import Icon from '../components/Icon';
 import { useBackend } from '../hooks/useBackend';
@@ -7,6 +7,11 @@ import { useVoice } from '../hooks/useVoice';
 import VoiceControls from '../components/VoiceControls';
 import { useSpeech } from '../hooks/useSpeech';
 import SpeechControls from '../components/SpeechControls';
+import { useMemory } from '../hooks/useMemory';
+import MemoryPanel from '../components/MemoryPanel';
+import { useAssistantPreferences } from '../hooks/useAssistantPreferences';
+import AssistantPreferences from '../components/AssistantPreferences';
+import ToolPanel from '../components/ToolPanel';
 
 interface Activity { id: number; text: string; time: Date; tone: string }
 const timeLabel = (date: Date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -15,12 +20,18 @@ export default function HomePage() {
   const { connection, health, error, checking, lastChecked, retry } = useBackend();
   const [now, setNow] = useState(new Date());
   const [draft, setDraft] = useState('');
-  const { messages, busy, error: chatError, send, stop, acknowledge } = useChat();
+  const memory = useMemory();
+  const preferences = useAssistantPreferences(memory.ready && memory.settings.enabled);
+  const { messages, busy, error: chatError, memoryNotice, summary, summarizedTurns, clearSummary, send, stop, acknowledge } = useChat(
+    memory.ready && memory.settings.enabled && memory.settings.save_history, preferences.overridden ? preferences.value : undefined);
   const speech = useSpeech();
   const [voiceConsent, setVoiceConsent] = useState(false);
   const [continuous, setContinuous] = useState(false);
   const [activities, setActivities] = useState<Activity[]>([]);
   const sequence = useRef(0);
+  const logToolActivity = useCallback((text: string, warning: boolean) => {
+    setActivities(value => [{ id: ++sequence.current, text, time: new Date(), tone: warning ? 'warn' : 'good' }, ...value].slice(0, 50));
+  }, []);
   const previous = useRef('');
   const logEnd = useRef<HTMLDivElement>(null);
   const online = connection === 'online';
@@ -119,9 +130,10 @@ export default function HomePage() {
                   : messages.map(message => <article className={`message message-${message.role}`} key={message.id}><div className="message-meta"><span><span className="user-avatar">{message.role === 'user' ? 'Y' : 'J'}</span>{message.role === 'user' ? message.source === 'voice' ? 'YOU · VOICE' : 'YOU' : 'JARVIS'}</span><time dateTime={message.time.toISOString()}>{timeLabel(message.time)}</time></div><p>{message.text}</p><span className="message-state">{message.state === 'sending' ? message.role === 'assistant' ? 'Streaming response…' : 'Awaiting local AI…' : message.state === 'complete' ? message.acknowledgement ? 'Wake acknowledgement' : message.role === 'assistant' ? 'Local AI · Complete' : 'Sent to local AI' : message.state === 'stopped' ? 'Stopped · Excluded from context' : 'Incomplete · Excluded from context'}</span></article>)}
                 {busy && <div className="chat-progress" role="status">{messages.some(message => message.role === 'assistant' && message.state === 'sending') ? 'JARVIS is responding…' : 'Waiting for Ollama. The model may be loading…'}</div>}
                 {chatError && <div className="connection-error chat-error" role="alert">{chatError}</div>}
+                {memoryNotice && <p className="memory-notice" role="status">{memoryNotice}</p>}
                 <div ref={logEnd} />
               </div>
-              <div className="conversation-footer"><span className="tiny-dot" />SESSION ONLY<span>History clears on refresh</span></div>
+              <div className="conversation-footer"><span className="tiny-dot" />SESSION ONLY<span>Live chat clears on refresh</span></div>
             </section>
 
             <section className="panel system-panel" id="system" aria-labelledby="system-title">
@@ -131,7 +143,7 @@ export default function HomePage() {
                 <div className="system-row"><span>AI model</span><strong>{online ? health?.ai_connected ? 'Connected' : 'Not connected' : 'Unknown'}</strong></div>
                 {online && health?.model && <div className="system-row"><span>Selected model</span><strong>{health.model}</strong></div>}
                 <div className="system-row"><span>Voice input</span><strong>{voice.active ? voice.state : 'Off · Opt-in'}</strong></div>
-                <div className="system-row"><span>Computer control</span><strong>Not implemented</strong></div>
+                <div className="system-row"><span>Computer control</span><strong>Approval required</strong></div>
               </div>
               {error && <div className="connection-error" role="alert">{error} Start the backend, then refresh.</div>}
               {online && !health?.ai_connected && health?.ai_message && <div className="connection-error" role="status">{health.ai_message}</div>}
@@ -151,6 +163,14 @@ export default function HomePage() {
             start={startVoice} stop={voice.stop} finish={voice.finish} />
 
           <SpeechControls speech={speech} />
+          <MemoryPanel memory={memory} />
+          <ToolPanel onActivity={logToolActivity} />
+          <AssistantPreferences preferences={preferences} memoryEnabled={memory.ready && memory.settings.enabled} />
+          <details className="voice-controls session-context"><summary>SESSION CONTEXT {summarizedTurns ? ` · ${summarizedTurns} older exchanges summarized` : ''}</summary>
+            <p>Recent completed turns stay in context. Older turns are condensed into bounded source-labelled quotes, not verified facts. Initial context anchors and recent summary quotes are retained; some detail is omitted. This summary stays in browser memory and is never saved as an approved fact or archived with chat.</p>
+            {summary ? <><pre>{summary}</pre><div className="voice-actions"><button type="button" disabled={busy} onClick={clearSummary}>Clear older session summary</button></div></> : <p>No older-session summary yet.</p>}
+          </details>
+          {memory.ready && memory.settings.save_history && <p className="memory-banner" role="status">History saving is ON. New completed text exchanges will be stored locally. Open memory controls to disable it.</p>}
 
           <form className="command-bar" onSubmit={submit} aria-label="Command input"><div className="command-entry"><span className="command-symbol" aria-hidden="true">›_</span><label className="sr-only" htmlFor="command">Message JARVIS</label><input id="command" value={draft} onChange={event => setDraft(event.target.value)} maxLength={4000} placeholder="Type a message to JARVIS…" autoComplete="off" /><span className="keyboard-hint">ENTER ↵</span><button className="mic-button" type="button" onClick={() => voice.active ? voice.stop() : startVoice()} disabled={!voice.active && (!online || busy)} aria-label={voice.active ? "Stop microphone" : "Start microphone"} title="Microphone capture requires session consent"><Icon name="mic" /></button>{busy && <button className="stop-button" type="button" onClick={stop} aria-label="Stop response">Stop</button>}<button className="send-button" type="submit" disabled={!draft.trim() || busy || !online} aria-label="Send message to JARVIS"><span>Send</span><Icon name="arrow" size={18} /></button></div><div className="command-note"><span><span className="tiny-dot" />{online ? 'LOCAL BACKEND CONNECTED' : connection === 'checking' ? 'CHECKING LOCAL BACKEND' : 'LOCAL BACKEND UNAVAILABLE'}</span><span>Local AI conversation - Voice input and speech output are opt-in</span></div></form>
           <footer className="page-footer"><span>JARVIS INTERFACE <b>V.0.1</b></span><span>LOCAL FIRST. ALWAYS YOURS.</span></footer>

@@ -1,9 +1,13 @@
 export interface Turn { role: 'user' | 'assistant'; content: string }
 
-export async function streamChat(messages: Turn[], signal: AbortSignal, onDelta: (text: string) => void): Promise<void> {
+export async function streamChat(messages: Turn[], signal: AbortSignal, onDelta: (text: string) => void,
+  memory?: { conversation_id: string; turn_id: string; save_history: true; onStatus: (status: string) => void },
+  context?: { summary: string; preferences?: { tone: string; detail: string } }): Promise<void> {
   const response = await fetch('/api/chat', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages }), signal,
+    body: JSON.stringify({ messages, ...(memory ? { conversation_id: memory.conversation_id, turn_id: memory.turn_id, save_history: true } : {}),
+      ...(context?.summary ? { context_summary: context.summary } : {}),
+      ...(context?.preferences ? { assistant_preferences: context.preferences } : {}) }), signal,
   });
   if (!response.ok) {
     const data = await response.json().catch(() => null);
@@ -20,6 +24,7 @@ export async function streamChat(messages: Turn[], signal: AbortSignal, onDelta:
     if (!line.trim()) return false;
     const event = JSON.parse(line);
     if (event.type === 'error') throw new Error(event.error?.message || 'The AI response was interrupted.');
+    if (event.type === 'memory' && typeof event.status === 'string') { memory?.onStatus(event.status); return false; }
     if (event.type === 'delta' && typeof event.content === 'string') {
       received ||= Boolean(event.content);
       onDelta(event.content);

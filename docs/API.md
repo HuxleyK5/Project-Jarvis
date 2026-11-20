@@ -1,6 +1,10 @@
-# JARVIS Local API v0.4.0
+# JARVIS Local API v0.7.0
 
-Start with `python -m backend.main` using the project virtual environment. Default base URL: `http://127.0.0.1:8000`. Ollama is the local text provider; voice input is optional and consent-gated; Piper output is optional; computer control is not implemented. JARVIS never pulls models. See [Ollama setup](OLLAMA_SETUP.md).
+Start with `python -m backend.main` using the project virtual environment. Default base URL: `http://127.0.0.1:8000`. Ollama is the local text provider; voice input/output, memory and predefined computer tools are opt-in. JARVIS never pulls models. See [Ollama setup](OLLAMA_SETUP.md).
+
+## Computer tools
+
+API v0.7 adds `/tools/session`, `/tools/policy`, `/tools/proposals`, `/tools/plan`, `/tools/operations/{id}` with execute/cancel actions, and `/tools/activity`. The session endpoint exposes the strict schema catalog to the localhost dashboard; other routes require the session header token. Permissions default off and require approval; every execution also requires approval of a validated, pending proposal. See [TOOLS.md](TOOLS.md) for request formats, errors, directory restrictions, metadata logging, cancellation and privacy limits. Ordinary `/chat` never executes tools.
 
 | Method | Path | Result |
 | --- | --- | --- |
@@ -25,7 +29,7 @@ Backend health stays HTTP 200 even if the model is missing. `ai_connected: true`
 
 This is an example API payload, not a claimed live model result. Messages alternate user/assistant, start with user, and end with a user question. System roles and extra fields are rejected; the backend injects its own JARVIS personality. Limits: 41 messages, 4000 characters per user message, 16000 per assistant-history message, and 40000 total content characters. Blank messages are invalid.
 
-The browser owns session context. It sends recent completed pairs plus the current question. The backend retains the current question plus recent whole pairs, at most 10 preceding pairs, within an approximate character budget (twice context tokens, minimum 4000 characters). This is not exact token counting. Ollama enforces the configured token window; very long or multilingual context can still be truncated. Older turns eventually fall out of context. No transcript is written to disk or stored between requests on the backend. Separate browser pages have separate transcripts; reload starts fresh. Failed, cancelled, or incomplete turns are not used as follow-up context by the frontend.
+The browser owns session context. It sends recent completed pairs plus the current question. The backend retains the current question plus recent whole pairs, at most 10 preceding pairs, within an approximate character budget (twice context tokens, minimum 4000 characters). This is not exact token counting. Ollama enforces the configured token window; very long or multilingual context can still be truncated. Older turns eventually fall out of context. Temporary context is not stored between requests. Separately opted-in completed exchanges may be archived in SQLite; see the Phase 3 memory API below. Separate browser pages have separate transcripts; reload starts fresh. Failed, cancelled, or incomplete turns are not used as follow-up context by the frontend.
 
 ## Streaming response
 
@@ -74,3 +78,15 @@ See [VOICE_SETUP.md](VOICE_SETUP.md) for privacy behavior, model licensing, asse
 `POST /speech/synthesize` accepts a JSON text field with 1-1000 nonblank characters; extra fields such as model paths are rejected. Successful replies are `audio/wav` with `Cache-Control: no-store`. Missing setup returns HTTP 503, a busy native job returns 429, synthesis failure returns 502, and a 60-second deadline returns 504, using the standard JSON error envelope. Audio is generated in memory. The browser owns playback, output routing, and interruption. See [SPEECH_OUTPUT.md](SPEECH_OUTPUT.md).
 
 The voice socket also accepts `{"type":"ping"}` control messages so playback pauses do not require forwarding microphone audio. Wake acknowledgements are displayed separately from AI-generated replies and do not change the chat request contract.
+
+## Phase 3 SQLite memory
+
+Memory saving and retrieval are opt-in. `GET/PUT /memory/settings` manage enablement and separate future-history consent. `GET/POST /memory/entries` list/search or approve preferences/projects/facts; `PUT/DELETE /memory/entries/{id}` edit/delete. `GET /memory/conversations?q=...` searches archived exchanges; `DELETE /memory/conversations/{turn_id}` deletes one. Saving/editing requires `approved:true`; deletion requires `confirm=true`. Sensitive patterns are rejected, and duplicate memories return 409.
+
+Optional `/chat` fields `save_history:true`, `conversation_id`, and `turn_id` (UUIDs) request saving the current completed pair when persisted history consent is also enabled. A memory status event (`saved`, `duplicate`, `disabled`, `skipped_sensitive`, or `error`) precedes done. Failed/non-opted-in turns are not archived. Approved entries may be retrieved for AI reference independently of temporary context. See [MEMORY.md](MEMORY.md) for payloads, defaults, privacy limitations, and restart verification.
+
+## Conversation continuity and personalization
+
+Optional chat fields: `context_summary` is temporary, untrusted extractive text (max 5000 characters); `assistant_preferences` contains only tone (`professional`, `friendly`, `formal`) and detail (`balanced`, `concise`, `detailed`). Request style overrides the approved saved style for that session without writing it. Neither summaries nor retrieved data are included in archive persistence.
+
+`GET /memory/personality` returns authorized saved style or defaults. `PUT /memory/personality` requires tone/detail, `approved:true`, and enabled memory. `PUT /memory/settings` now accepts separate `recall_history` consent, default false. Archive recall requires that permission, enabled memory, and a prior-conversation reference. Saved preferences now require relevance, rather than being inserted into every response. See [CONVERSATION.md](CONVERSATION.md) for bounded context behavior and schema compatibility.
