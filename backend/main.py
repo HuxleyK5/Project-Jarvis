@@ -28,6 +28,13 @@ from backend.memory.manager import MemoryManager, MemoryError
 from backend.memory.api import router as memory_router, AssistantStyle
 from backend.tools.registry import ToolRegistry, ToolError
 from backend.tools.api import router as tools_router
+from backend.automation.engine import AutomationEngine
+from backend.automation.api import router as automation_router
+from backend.integrations.google.manager import GoogleIntegrations
+from backend.integrations.google.secure_store import SecureStore
+from backend.integrations.google.setup import DEFAULT_STORE
+from backend.integrations.google.api import router as google_router
+from backend.integrations.google.privacy import install_log_privacy
 from secrets import token_urlsafe
 
 logger = logging.getLogger(__name__)
@@ -91,8 +98,10 @@ class ErrorResponse(BaseModel):
 
 
 def create_app(settings: Settings | None = None, provider: ModelProvider | None = None,
-               memory: MemoryManager | None = None, tools: ToolRegistry | None = None) -> FastAPI:
+               memory: MemoryManager | None = None, tools: ToolRegistry | None = None,
+               google: GoogleIntegrations | None = None) -> FastAPI:
     settings = settings if settings is not None else Settings.from_env()
+    install_log_privacy()
 
     @asynccontextmanager
     async def lifespan(application: FastAPI):
@@ -103,6 +112,9 @@ def create_app(settings: Settings | None = None, provider: ModelProvider | None 
         application.state.tools = tools if tools is not None else ToolRegistry(
             Path(__file__).resolve().parents[1] / 'data' / 'tool-audit.jsonl')
         application.state.tool_token = token_urlsafe(32)
+        application.state.google = google if google is not None else GoogleIntegrations(SecureStore(DEFAULT_STORE))
+        application.state.automation = AutomationEngine(application.state.tools,
+            application.state.tools.audit_path.with_name('workflow-history.jsonl'))
         brain = Brain(settings, provider if provider is not None else create_provider(settings), manager)
         application.state.assistant = Assistant(brain)
         application.state.generation_lock = asyncio.Lock()
@@ -111,6 +123,8 @@ def create_app(settings: Settings | None = None, provider: ModelProvider | None 
         try:
             yield
         finally:
+            await application.state.google.close()
+            await application.state.automation.close()
             application.state.tools.close()
             application.state.voice.close()
             application.state.speech.close()
@@ -118,7 +132,7 @@ def create_app(settings: Settings | None = None, provider: ModelProvider | None 
 
     application = FastAPI(
         title="JARVIS Local API",
-        version="0.7.0",
+        version="0.9.0",
         description="Local chat, optional voice/memory, and opt-in permission-controlled computer tools.",
         docs_url=None,
         redoc_url=None,
@@ -130,11 +144,13 @@ def create_app(settings: Settings | None = None, provider: ModelProvider | None 
     application.include_router(speech_router)
     application.include_router(memory_router)
     application.include_router(tools_router)
+    application.include_router(automation_router)
+    application.include_router(google_router)
 
     @application.middleware('http')
     async def tool_response_privacy(request: Request, call_next):
         response = await call_next(request)
-        if request.url.path.startswith('/tools'):
+        if request.url.path.startswith(('/tools', '/automation', '/integrations/google')):
             response.headers['Cache-Control'] = 'no-store'
             response.headers['X-Content-Type-Options'] = 'nosniff'
         return response
@@ -244,8 +260,29 @@ def create_app(settings: Settings | None = None, provider: ModelProvider | None 
     async def documentation():
         # Self-contained documentation avoids third-party CDN requests.
         return """<!doctype html><html lang="en"><meta charset="utf-8">
-<title>JARVIS API documentation</title><main><h1>JARVIS Local API v0.7.0</h1>
+<title>JARVIS API documentation</title><main><h1>JARVIS Local API v0.9.0</h1>
 <p>Local Ollama conversations, opt-in voice, memory and restricted computer tools. No automatic downloads.</p>
+<h2>Google productivity integrations</h2><p>All /integrations/google routes require the localhost tool session token.
+GET /integrations/google/status exposes independent enabled/auth/scope status, never tokens.
+PUT /integrations/google/{service}/settings requires approved=true; services default disabled.
+POST /integrations/google/{service}/connect starts desktop PKCE OAuth using a temporary loopback listener.
+Cancel-auth stops consent; disconnect requires approval to forget local encrypted tokens.
+GET calendar/events reads the primary calendar. POST calendar/proposals previews one event.
+GET gmail/messages searches authorized messages; message and thread routes read selected content.
+POST gmail/threads/{id}/summarize requires approval for local-only AI summarization.
+POST gmail/proposals/create_draft or send_message previews exact mail content.
+GET classroom/courses and classroom/courses/{id}/assignments expose permitted read-only coursework.
+POST proposals/{id}/execute requires approved=true; proposals/{id}/cancel cancels a pending action.
+Credentials use Windows-user DPAPI; setup imports your own Desktop OAuth client offline.
+See docs/GOOGLE_INTEGRATIONS.md for scopes, account/admin restrictions, tests and setup.</p>
+<h2>Automation workflows</h2><p>All /automation routes require the existing tool session token and same-origin protections.
+GET/PUT /automation/policy manages separately approved session enablement and automatic low-risk tool choices.
+POST /automation/plan accepts a question and returns a non-executing model plan; POST /automation/plans accepts a strict explicit plan.
+GET /automation/workflows lists session plans; GET /automation/workflows/{id} includes ordered step results and completion reports.
+POST /automation/workflows/{id}/start requires approved=true for any confirmation-category step; blocked plans never execute.
+POST /automation/workflows/{id}/cancel stops remaining work. POST /automation/workflows/{id}/schedule accepts approved=true and an ISO when timestamp.
+APScheduler is optional and never automatically installed. Significant scheduled actions wait for fresh confirmation when due.
+GET /automation/history returns persistent metadata only. See docs/AUTOMATION.md for limits and verification details.</p>
 <h2>Computer tools</h2><p>GET /tools/session returns the session token and JSON-schema catalog to the local dashboard.
 All other /tools routes require X-Jarvis-Tool-Token and a trusted local origin/Host. PUT /tools/policy requires approved=true;
 permissions reset on restart. POST /tools/proposals validates one tool; POST /tools/plan uses Ollama to propose one.

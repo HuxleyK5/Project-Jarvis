@@ -14,8 +14,10 @@ Only individual user prompts authorize implementation. This roadmap does not aut
 | Phase 3: SQLite memory | Approved entries, opt-in archives, retrieval, search/edit/delete, privacy controls, and restart tests | Implemented; SQLite persistence verified across actual backend process restart |
 | Conversation intelligence | Follow-up context, relevant memory, approved archive recall, extractive summaries, configurable style, and tests | Implemented; live model quality awaits available Ollama |
 | Phase 4: computer tools | Schema registry, local permissions, per-action approval, system/file tools, approved Windows app/site opening, cancellation and audit activity | Implemented; native launch handoffs and AI selection tested with injected adapters/provider; live Ollama quality unverified |
+| Automation engine | Natural-language ordered plans, automatic/confirmation/blocked policy, sequential verified execution, cancellation, metadata history, optional APScheduler | Implemented; APScheduler not installed per user instruction, scheduling adapter tested with injection and real adapter test skipped |
+| Phase 5: productivity integrations | Google Calendar/Gmail/Classroom official REST adapters, per-service desktop OAuth, encrypted credentials, consent/status and approved external writes | Implemented; independent synthetic API tests and real DPAPI/loopback callback verified; live accounts and administrator access unverified without credentials/consent |
 | Future phases | Scope to be provided by the user | Not specified or implemented |
 
 For each increment: inspect the existing project, preserve working behavior, implement only the requested scope, test important behavior, explain affected files and run/test steps, then stop.
 
-Obtain approval before dependency installation, model downloads, or system setting changes. Ask before implementing destructive or security-sensitive operations. Autonomous automation, destructive tools, and additional providers remain deferred.
+Obtain approval before dependency installation, model downloads, or system setting changes. Ask before implementing destructive or security-sensitive operations. Unrestricted autonomous agents, destructive tools, and additional providers remain deferred.

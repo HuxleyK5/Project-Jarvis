@@ -1,1 +1,1 @@
-"""JARVIS backend automation package; implementation deferred."""
+"""Permission-controlled planning, sequential execution, verification and scheduling."""

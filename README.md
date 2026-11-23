@@ -1,6 +1,6 @@
 # JARVIS
 
-Personal AI assistant project built incrementally. Current scope: local Ollama conversation brain, streaming FastAPI chat, and responsive React dashboard. Phase 2 adds opt-in local voice input; optional Piper voice output is implemented. Phase 3 adds opt-in SQLite memory. Phase 4 adds predefined permission-controlled computer tools; autonomous automation remains outside scope.
+Personal AI assistant project built incrementally. Current scope: local Ollama conversation brain, streaming FastAPI chat, and responsive React dashboard. Phase 2 adds opt-in local voice input; optional Piper voice output is implemented. Phase 3 adds opt-in SQLite memory. Phase 4 adds predefined permission-controlled computer tools and a bounded approved workflow engine. Phase 5 adds independently authorized Google productivity integrations.
 
 This repository is the JARVIS root; no nested JARVIS directory is needed.
 
@@ -12,9 +12,10 @@ This repository is the JARVIS root; no nested JARVIS directory is needed.
 | backend/core/ | Assistant coordination, personality, context policy, and provider contract |
 | backend/voice/ | Optional wake detection, speech recognition, consent-gated audio sessions, and diagnostics |
 | backend/memory/ | SQLite manager, approval/privacy guard, search, and management API |
-| backend/automation/ | Future user-authorized action workflows |
+| backend/automation/ | Ordered workflow plans, risk permissions, execution/verification/history, and optional APScheduler adapter |
 | backend/tools/ | Strict tool catalog, session permissions, approval/cancellation, read-only file tools and Windows launch adapters |
 | backend/integrations/ | Local Ollama adapter and provider factory |
+| backend/integrations/google/ | Official Google service adapters, desktop OAuth/PKCE, Windows DPAPI storage and approved writes |
 | backend/tests/ | Backend tests |
 | frontend/ | Independent React, TypeScript, and Vite dashboard |
 | frontend/src/components/ | Reusable UI elements |
@@ -167,10 +168,26 @@ SQLite v1 data remains readable; schema v2 adds options on the next authorized w
 
 ## Phase 4: computer tools
 
-Restart the backend for API v0.7.0 with `.\.venv\Scripts\python.exe -B -m backend.main`; start the independent frontend with `cd frontend` then `npm run dev`. Open `http://127.0.0.1:5173` and expand **COMPUTER TOOLS**.
+Restart the backend for API v0.8.0 with `.\.venv\Scripts\python.exe -B -m backend.main`; start the independent frontend with `cd frontend` then `npm run dev`. Open `http://127.0.0.1:5173` and expand **COMPUTER TOOLS**.
 
 Tools default off. Approve session permissions for selected local folders, built-in Notepad/Calculator, and exact HTTPS websites. Choose a tool manually or ask local Ollama to propose one. Review its exact inputs, check the separate action approval, and run it. Results appear in the tool panel; transitions appear in Activity History. Manual tools work without Ollama. Ordinary chat does not execute actions.
 
 The registry supports basic system information, directory listing, recursive filename search, selected UTF-8 text reading, and allowlisted Windows app/site opening. File tools never edit or delete documents. Cancellation, approval expiry, revocation and strict schemas are enforced by the backend. Execution metadata is appended to ignored `data/tool-audit.jsonl`; paths, requests and document contents are excluded. No new dependencies or models are needed.
 
 Test with `.\.venv\Scripts\python.exe -B -m unittest discover -s backend/tests -v` from the root, then `npm run build` and `npm test` from `frontend`. See [TOOLS.md](docs/TOOLS.md) for limits, API schemas, independent tool tests, privacy and native-launch/model verification limitations.
+
+## Automation workflows
+
+Open **WORKFLOWS**, approve session enablement and select which eligible low-risk tools may run automatically. Describe one outcome to generate an ordered plan of up to eight existing tools. Plans never execute merely because they were generated. Review the steps, approve the exact plan if any significant step requires confirmation, and start it. Unauthorized/unsafe steps block the entire plan. Verification failures stop remaining steps; reports distinguish completed and incomplete actions. Cancel stops future work, and the existing activity feed shows workflow progress.
+
+Manual structured plans work without Ollama. Workflow permissions default off and reset on restart. Execution history stores only metadata in `data/workflow-history.jsonl`; prompts, paths, document contents and results stay out of persistent history. Existing memory privacy controls remain separate.
+
+APScheduler integration is included for future one-time workflows, but **APScheduler was not installed per your instruction**. Scheduling remains disabled with a clear missing-dependency message; immediate workflows remain functional. See [AUTOMATION.md](docs/AUTOMATION.md) for permission categories, limitations, future confirmation behavior, run/test instructions, and the optional dependency declaration. No unrestricted commands or new file-modifying capabilities were added.
+
+## Phase 5: Google productivity
+
+The dashboard's **GOOGLE PRODUCTIVITY** panel provides independently enabled Calendar, Gmail and Classroom integrations using official APIs. All default off. Calendar reads upcoming primary-calendar events and previews approved event creation. Gmail reads/searches authorized messages, summarizes selected conversations locally with consent, creates approved drafts and requires a separate confirmation before sending. Classroom groups authorized published coursework and due dates by class; unavailable API/admin permissions are reported honestly.
+
+No dependencies were installed. Credentials use native Windows DPAPI encryption. Supply your own **Desktop app** OAuth client JSON through the offline import command, then connect each desired service using Google's browser consent. No credentials are hardcoded or entered into chat. [GOOGLE_INTEGRATIONS.md](docs/GOOGLE_INTEGRATIONS.md) contains setup, minimum scopes, storage/privacy details, API limits, run/test commands and verification limitations. Live Google account access is unverified because no credentials/consent were supplied.
+
+Startup is unchanged: `.\.venv\Scripts\python.exe -B -m backend.main` from the root; `npm run dev` from `frontend`; open `http://127.0.0.1:5173`. Restart for API v0.9.0. Test with the backend unittest suite, `npm run build`, and `npm test`.

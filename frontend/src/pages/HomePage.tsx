@@ -12,6 +12,8 @@ import MemoryPanel from '../components/MemoryPanel';
 import { useAssistantPreferences } from '../hooks/useAssistantPreferences';
 import AssistantPreferences from '../components/AssistantPreferences';
 import ToolPanel from '../components/ToolPanel';
+import AutomationPanel from '../components/AutomationPanel';
+import GooglePanel from '../components/GooglePanel';
 
 interface Activity { id: number; text: string; time: Date; tone: string }
 const timeLabel = (date: Date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -165,6 +167,8 @@ export default function HomePage() {
           <SpeechControls speech={speech} />
           <MemoryPanel memory={memory} />
           <ToolPanel onActivity={logToolActivity} />
+          <AutomationPanel onActivity={logToolActivity} />
+          <GooglePanel onActivity={logToolActivity} />
           <AssistantPreferences preferences={preferences} memoryEnabled={memory.ready && memory.settings.enabled} />
           <details className="voice-controls session-context"><summary>SESSION CONTEXT {summarizedTurns ? ` · ${summarizedTurns} older exchanges summarized` : ''}</summary>
             <p>Recent completed turns stay in context. Older turns are condensed into bounded source-labelled quotes, not verified facts. Initial context anchors and recent summary quotes are retained; some detail is omitted. This summary stays in browser memory and is never saved as an approved fact or archived with chat.</p>

@@ -1,8 +1,14 @@
-# JARVIS Local API v0.7.0
+# JARVIS Local API v0.9.0
 
 Start with `python -m backend.main` using the project virtual environment. Default base URL: `http://127.0.0.1:8000`. Ollama is the local text provider; voice input/output, memory and predefined computer tools are opt-in. JARVIS never pulls models. See [Ollama setup](OLLAMA_SETUP.md).
 
+## Google productivity integrations
+
+API v0.9 adds token-protected `/integrations/google` status, per-service settings/connect/disconnect, Calendar reads/event proposals, Gmail search/message/thread/local-summary and draft/send proposals, Classroom course/assignment reads, and exact-action execution/cancellation. Services default off. OAuth credentials are imported offline and encrypted with Windows-user DPAPI; access/refresh tokens never appear in status responses. The consent callback uses a temporary localhost listener with state/PKCE, not a public callback endpoint. Live API access still requires your own OAuth client, Google consent and any school/admin approval. See [GOOGLE_INTEGRATIONS.md](GOOGLE_INTEGRATIONS.md) for routes, scopes, setup and limits. Automatic workflows and `/chat` cannot issue Google writes.
+
 ## Computer tools
+
+API v0.8 adds the token-protected `/automation` policy, natural-language/explicit plan, workflow start/cancel/schedule, session status and persistent metadata-history endpoints. Automatic low-risk actions require explicit session opt-in; significant actions require exact-plan approval. A blocked step prevents all execution. APScheduler scheduling is optional and unavailable until separately approved installation; immediate workflows need no new dependencies. See [AUTOMATION.md](AUTOMATION.md) for contracts and limitations. `/chat` still does not execute actions.
 
 API v0.7 adds `/tools/session`, `/tools/policy`, `/tools/proposals`, `/tools/plan`, `/tools/operations/{id}` with execute/cancel actions, and `/tools/activity`. The session endpoint exposes the strict schema catalog to the localhost dashboard; other routes require the session header token. Permissions default off and require approval; every execution also requires approval of a validated, pending proposal. See [TOOLS.md](TOOLS.md) for request formats, errors, directory restrictions, metadata logging, cancellation and privacy limits. Ordinary `/chat` never executes tools.
 

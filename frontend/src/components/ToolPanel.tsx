@@ -104,7 +104,7 @@ export default function ToolPanel({ onActivity }: { onActivity: (text: string, w
   }
   function acceptProposal(value: Operation) { setOperation(value); setActionApproval(false); }
 
-  return <details className="voice-controls tool-controls"><summary>COMPUTER TOOLS · {policy.enabled ? 'SESSION ENABLED' : 'DISABLED'}</summary>
+  return <details className="voice-controls tool-controls capability-controls"><summary>COMPUTER TOOLS · {policy.enabled ? 'SESSION ENABLED' : 'DISABLED'}</summary>
     <p>Every action requires an exact preview and approval. Permissions last until backend restart. Tools never edit your documents or run shell commands. Only execution metadata is saved to data/tool-audit.jsonl; results stay in server/browser memory.</p>
     <fieldset disabled={busy || planning}>
       <legend>Session permissions</legend>

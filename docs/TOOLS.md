@@ -2,6 +2,8 @@
 
 Tools default **off** on every backend start. No dependency installation, model download, or system setting change is required. Open the dashboard's **COMPUTER TOOLS** panel. Approve the session permissions, preview one manual or model-selected action, and approve its exact inputs before running it. Ordinary chat does not execute tools.
 
+The separate [automation engine](AUTOMATION.md) can sequence these same capabilities under its own explicitly approved workflow permissions. Its automatic low-risk opt-in and significant-action confirmation do not change this panel's single-action approval behavior or expand file/app/site access.
+
 ## Capabilities
 
 | Registry name | Inputs | Result and limits |

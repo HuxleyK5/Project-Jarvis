@@ -235,13 +235,25 @@ h2 svg { color: #66bdd5; }
   *, *:before, *:after { animation: none !important; transition: none !important; }
 }
 
-.tool-controls fieldset { min-width: 0; border: 1px solid #294252; padding: 16px; margin: 16px 0; border-radius: 6px; }
-.tool-controls legend { color: #8cdeef; font-size: 12px; padding: 0 8px; }
-.tool-controls label { display: block; margin: 10px 0; font-size: 12px; color: #c3d7e3; }
-.tool-controls input:not([type="checkbox"]), .tool-controls textarea, .tool-controls select { display: block; width: 100%; min-width: 0; margin-top: 7px; padding: 10px; color: #d4e9f4; background: #091620; border: 1px solid #335064; border-radius: 4px; }
-.tool-controls textarea { min-height: 72px; resize: vertical; font-family: var(--mono); font-size: 11px; }
-.tool-controls pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 320px; overflow: auto; background: #07131d; padding: 14px; border-radius: 4px; font-size: 11px; }
-.tool-controls button { margin: 6px 10px 6px 0; }
-.tool-controls fieldset:disabled { opacity: .55; }
+.capability-controls fieldset { min-width: 0; border: 1px solid #294252; padding: 16px; margin: 16px 0; border-radius: 6px; }
+.capability-controls legend { color: #8cdeef; font-size: 12px; padding: 0 8px; }
+.capability-controls label { display: block; margin: 10px 0; font-size: 12px; color: #c3d7e3; }
+.capability-controls input:not([type="checkbox"]), .capability-controls textarea, .capability-controls select { display: block; width: 100%; min-width: 0; margin-top: 7px; padding: 10px; color: #d4e9f4; background: #091620; border: 1px solid #335064; border-radius: 4px; }
+.capability-controls textarea { min-height: 72px; resize: vertical; font-family: var(--mono); font-size: 11px; }
+.capability-controls pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 320px; overflow: auto; background: #07131d; padding: 14px; border-radius: 4px; font-size: 11px; }
+.capability-controls button { margin: 6px 10px 6px 0; }
+.capability-controls fieldset:disabled { opacity: .55; }
 .tool-result { border: 1px solid #36738a; padding: 16px; border-radius: 6px; }
 .tool-result h3 { color: #85def1; font-size: 14px; }
+.workflow-steps { padding-left: 22px; }
+.workflow-steps > li { margin: 14px 0; padding: 12px; border-left: 2px solid #36738a; background: #0a1823; overflow-wrap: anywhere; }
+.workflow-steps strong { color: #b4e9f2; font-size: 12px; }
+.workflow-history li { margin: 10px 0; font: 11px/1.7 var(--mono); overflow-wrap: anywhere; }
+.google-service { border: 1px solid #294252; border-radius: 7px; padding: 18px; margin: 18px 0; min-width: 0; }
+.google-service .panel-heading { gap: 12px; flex-wrap: wrap; }
+.google-service h3, .google-service h4 { color: #9fe4f1; font-size: 13px; }
+.google-service .panel-heading > span { font: 9px/1.7 var(--mono); color: #a5bacb; }
+.google-service code { overflow-wrap: anywhere; font-size: 10px; }
+.google-items { list-style: none; padding: 0; }
+.google-items > li, .google-course { border-left: 2px solid #33566a; padding: 12px; margin: 12px 0; background: #0a1823; overflow-wrap: anywhere; }
+.google-service p { white-space: pre-wrap; }

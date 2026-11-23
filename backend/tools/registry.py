@@ -79,6 +79,7 @@ class ToolRegistry:
     def __init__(self, audit_path: Path):
         self.audit_path = audit_path
         self.enabled = False
+        self.revision = 0
         self.roots = {}
         self.applications = []
         self.websites = {}
@@ -120,6 +121,7 @@ class ToolRegistry:
         if any(app not in {'notepad', 'calculator'} for app in applications):
             raise ToolError('Application is not in the built-in catalog.')
         with self.lock:
+            self.revision += 1  # Invalidates outstanding workflow permission snapshots.
             if not enabled:
                 # Revocation must still work when disk/log permissions have failed.
                 self.enabled = False
@@ -230,8 +232,10 @@ class ToolRegistry:
                     job['error'] = 'Cancelled; audit storage is unavailable.'
             return self.view(job_id)
 
-    async def execute(self, job_id):
+    async def execute(self, job_id, expected_revision=None):
         with self.lock:
+            if expected_revision is not None and expected_revision != self.revision:
+                raise ToolError('Tool permissions changed; generate a new workflow plan.', 409)
             job = self.jobs.get(job_id)
             if job is None:
                 raise ToolError('Action not found.', 404)
